@@ -1,0 +1,27 @@
+[package]
+name = "foil_cli"
+version = "0.1.0"
+authors = ["Alain Galvan <hi@alain.xyz>"]
+edition = "2021"
+
+[dependencies]
+async-recursion = "1.0.5"
+async-std = { version = "1.12.x", features = ["attributes"] }
+clap = "4.4.x"
+chrono = { version = "0.4.x", features = ["serde"] }
+serde = "1.0.x"
+serde_derive = "1.0.x"
+serde_json = "1.0.x"
+path-slash = "0.2.x"
+lexiclean = "0.0.1"
+sqlx = { version = "0.7.x", features = [
+    "bigdecimal",
+    "chrono",
+    "json",
+    "postgres",
+    "runtime-async-std-rustls",
+    "rust_decimal",
+    "time",
+    "uuid",
+] }
+futures = "0.3.x"
