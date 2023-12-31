@@ -1,32 +1,33 @@
 {
+  "buildOnSave": false,
+  "compileOnSave": false,
   "compilerOptions": {
-    "outDir": "dist",
-    "target": "es2020",
-    "lib": ["dom", "es2020"],
-    "module": "nodenext",
+    "allowSyntheticDefaultImports": true,
     "declaration": false,
-    "noImplicitAny": false,
-    "removeComments": true,
     "emitDecoratorMetadata": true,
+    "esModuleInterop": true,
     "experimentalDecorators": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": ["dom", "es2021"],
+    "module": "ESNext",
+    "moduleResolution": "node",
     "noEmitHelpers": false,
+    "noImplicitAny": false,
+    "outDir": "dist",
+    "removeComments": true,
+    "resolveJsonModule": true,
     "sourceMap": true,
     "strictNullChecks": false,
-    "jsx": "react-jsx",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "moduleResolution": "nodenext",
-    "isolatedModules": true
+    "target": "es2021",
   },
   "ts-node": {
-    "transpileOnly": true,
-    "files": true,
     "esm": true,
     "experimentalResolver": true,
-    "experimentalSpecifierResolution": "node"
+    "experimentalSpecifierResolution": "node",
+    "files": true,
+    "transpileOnly": true
   },
-  "include": ["src/**/*"],
   "exclude": ["node_modules"],
-  "compileOnSave": false,
-  "buildOnSave": false
+  "include": ["src/**/*"]
 }

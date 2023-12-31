@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
 
+use super::get_foil_builder_path;
 use super::metadata::FoilMetadataStatus;
 use super::resolver::Foil;
 use super::static_assets::FoilFile;
 use crate::{BuildMode, Result};
-use std::env;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+
 //=====================================================================================================================
 // NPM is somewhat buggy at times, and requires the extension on windows.
 #[cfg(windows)]
@@ -19,23 +20,9 @@ const NPM: &'static str = "npm";
 /// 🔎 Find all imports of a given main JS/TS file's dependency tree.
 pub fn find_all_imports(main: String, root_path: &PathBuf) -> Vec<FoilFile> {
     // The foil builder exists next to the current executable:
-    let foil_builder_path = env::current_exe()
-        .unwrap_or_default()
-        .parent()
-        .unwrap()
-        .join(PathBuf::from("builder"));
+    let foil_builder_path = get_foil_builder_path();
 
-    // First install all dependencies for the foil builder if they're not already there:
-    let _ci = match Command::new(NPM)
-        .current_dir(&foil_builder_path)
-        .arg("ci")
-        .arg("--include=dev")
-        .output()
-    {
-        Ok(_) => (),
-        Err(e) => println!("Failed to run NPM CI: {:?}", e),
-    };
-
+    // Run the import resolution script. We assume the builder's already configured with its node_modules.
     let root_path_string = root_path
         .to_str()
         .unwrap_or("/")
@@ -49,13 +36,7 @@ pub fn find_all_imports(main: String, root_path: &PathBuf) -> Vec<FoilFile> {
         .replace("\\", "/");
     let find = Command::new("node")
         .current_dir(&foil_builder_path)
-        .args([
-            "--loader",
-            "ts-node/esm",
-            "src/resolve-imports.ts",
-            &root_path_string,
-            &main_abs_str,
-        ])
+        .args(["dist/resolve-imports.js", &root_path_string, &main_abs_str])
         .output()
         .unwrap();
     let out_string = String::from_utf8(find.stdout).unwrap_or("[]".to_string());
@@ -120,9 +101,9 @@ pub fn find_all_imports(main: String, root_path: &PathBuf) -> Vec<FoilFile> {
 //=====================================================================================================================
 /// 🍱 Compile a given foil module with Webpack.
 pub fn compile_foil_main(
+    mode: BuildMode,
     resolved_foil: &Foil,
     foil_changed: FoilMetadataStatus,
-    mode: BuildMode,
 ) -> Result<Child> {
     // ⤵️ Install all dependencies for this project if they don't exist.
     let _ci = match Command::new(NPM)
@@ -149,22 +130,10 @@ pub fn compile_foil_main(
         }
     };
 
-    // Check if the SystemJS runtime needs to be built.
-    let runtime_changed = foil_changed.runtime_changed;
-
-    // Check if public vendor modules need to be built.
-    let public_modules_changed = foil_changed.public_modules_changed;
-
     // 🔨 Build foil project using node.js and webpack.
-    // This also builds the SystemJS runtime and writes the `importmap.json`.
-    // TODO: We should consider the case where only vendor modules have updated and we don't need to compile the input.
-
+    // This builds the output, and optionally the SystemJS runtime, import map, and vendor modules.
     // The foil builder exists next to the current executable:
-    let foil_builder_path = env::current_exe()
-        .unwrap_or_default()
-        .parent()
-        .unwrap()
-        .join(PathBuf::from("builder"));
+    let foil_builder_path = get_foil_builder_path();
     let root_path_str = resolved_foil
         .root_path
         .to_str()
@@ -193,12 +162,15 @@ pub fn compile_foil_main(
         &resolved_foil.title,
         "--root-path",
         &root_path_str,
-        "--input",
-        &resolved_foil.main,
         "--output",
         &output_path_str,
     ]);
-    if runtime_changed {
+
+    if foil_changed.files_changed {
+        compile.arg("--input");
+        compile.arg(&resolved_foil.main);
+    }
+    if foil_changed.runtime_changed {
         compile.arg("--system");
     }
     match mode {
@@ -215,7 +187,7 @@ pub fn compile_foil_main(
     compile.args(&resolved_foil.public_modules);
 
     // Output input map
-    if public_modules_changed {
+    if resolved_foil.frontend && foil_changed.public_modules_changed {
         if resolved_foil.frontend {
             compile.arg("--input-map");
         }

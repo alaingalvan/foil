@@ -11,6 +11,9 @@
   "main": "dist/foil-builder.js",
   "module": "dist/foil-builder.js",
   "exports": "./dist/foil-builder.js",
+  "scripts": {
+    "start": "tsc"
+  },
   "bin": {
     "foil-builder": "dist/foil-builder.js"
   },
@@ -32,17 +35,17 @@
   "devDependencies": {
     "@mdx-js/react": "^3.0.0",
     "@types/isomorphic-fetch": "^0.0.39",
-    "@types/node": "^20.10.4",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@types/react-redux": "^7.1.32",
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/react-redux": "^7.1.33",
     "@types/react-router": "^5.1.20",
     "@types/redux-thunk": "^2.1.32",
     "@types/webpack": "^5.28.5",
     "cross-env": "^7.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "6.20.1",
+    "react-router-dom": "6.21.1",
     "ts-node": "^10.9.2",
     "typescript": "5.3.3"
   },
@@ -63,13 +66,14 @@
     "dependency-tree": "^10.0.9",
     "file-loader": "^6.2.0",
     "find": "^0.3.0",
+    "graphql-tag": "^2.12.6",
     "highlight.js": "^11.9.0",
     "mdast": "^3.0.0",
     "mdast-util-mdx": "^3.0.0",
     "mini-css-extract-plugin": "^2.7.6",
     "path-browserify": "^1.0.1",
     "postcss-advanced-variables": "^3.0.1",
-    "postcss-loader": "7.3.3",
+    "postcss-loader": "7.3.4",
     "postcss-nested": "^6.0.1",
     "postcss-preset-env": "^9.3.0",
     "rehype-katex": "^7.0.0",
@@ -79,10 +83,10 @@
     "sanitize-html": "^2.11.0",
     "string-replace-loader": "^3.1.0",
     "style-loader": "^3.3.3",
+    "systemjs": "=6.14.2",
     "ts-loader": "^9.5.1",
     "unified": "^11.0.4",
     "unist-util-visit": "^5.0.0",
-    "webpack": "5.89.0",
-    "systemjs": "=6.14.2"
+    "webpack": "5.89.0"
   }
 }

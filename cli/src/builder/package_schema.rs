@@ -7,6 +7,9 @@ pub type StringMap = std::collections::HashMap<String, String>;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct NodePackage {
+    /// The name of this package, must be in snake-case.
+    #[serde(default = "default_empty_str")]
+    pub name: String,
     /// The single author of this node.js package.json project.
     pub author: NodeAuthor,
 
@@ -40,7 +43,7 @@ pub struct NodePackage {
 
 //=====================================================================================================================
 /// Node.js authors.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, sqlx::Type)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeAuthor {
     pub name: String,
@@ -90,14 +93,15 @@ pub struct FoilConfig {
     pub redirects: Vec<FoilRedirect>,
 
     /// RSS glob path to export posts from.
-    #[serde(default = "default_rss_str")]
-    pub rss: String,
+    #[serde(default = "default_rss_vec")]
+    pub rss: Vec<String>,
 }
 
 //=====================================================================================================================
 /// File/modified date pair.
 #[derive(Clone, Serialize, Deserialize, sqlx::Type, Debug)]
 #[serde(rename_all = "camelCase")]
+#[sqlx(type_name = "redirect")]
 pub struct FoilRedirect {
     /// Path redirecting from.
     pub from: String,
@@ -115,8 +119,8 @@ fn default_empty_str() -> String {
     "".to_string()
 }
 
-fn default_rss_str() -> String {
-    "/*".to_string()
+fn default_rss_vec() -> Vec<String> {
+    vec!["/blog/*".to_string()]
 }
 
 fn default_assets() -> Vec<String> {

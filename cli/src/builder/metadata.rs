@@ -1,12 +1,12 @@
 use serde_derive::{Deserialize, Serialize};
-use std::ffi::OsStr;
 use std::path::PathBuf;
-use std::str::FromStr;
-use std::{env, fs, io::Read};
+use std::{fs, io::Read};
 
+use super::get_foil_builder_path;
 use super::package_schema::StringMap;
 use super::resolver::Foil;
 use super::static_assets::FoilFile;
+use crate::BuildMode;
 
 //=====================================================================================================================
 /// Metadata for a given foil project.
@@ -15,7 +15,9 @@ use super::static_assets::FoilFile;
 pub struct FoilMetadata {
     /// Version number.
     pub version: u32,
-    /// Dependent files for this foil post.
+    /// release or development mode.
+    pub mode: String,
+    /// Source/output files for this foil post.
     pub files: Vec<FoilFile>,
     /// SystemJS version, if applicable.
     pub systemjs_version: String,
@@ -29,22 +31,17 @@ pub struct FoilMetadata {
 #[serde(rename_all = "camelCase")]
 pub struct FoilMetadataStatus {
     /// If any source files have changed.
-    pub source_files_changed: bool,
+    pub files_changed: bool,
     /// If the runtime has changed.
     pub runtime_changed: bool,
     /// If any public modules have changed.
     pub public_modules_changed: bool,
-    /// If the output has changed or is missing.
-    pub output_changed: bool,
 }
 
 //=====================================================================================================================
 impl FoilMetadataStatus {
     pub fn changed(&self) -> bool {
-        self.source_files_changed
-            || self.runtime_changed
-            || self.public_modules_changed
-            || self.output_changed
+        self.files_changed || self.runtime_changed || self.public_modules_changed
     }
 }
 
@@ -98,13 +95,8 @@ impl FoilMetadata {
     fn verify_runtime(&self, foil: &Foil) -> bool {
         if foil.frontend {
             let system_path = foil.output_path.join(PathBuf::from("system.js"));
-            let foil_builder_path = env::current_exe()
-                .unwrap_or_default()
-                .parent()
-                .unwrap()
-                .join(PathBuf::from("builder"));
-            let builder_package_path =
-                foil_builder_path.join(PathBuf::from("package.json"));
+            let foil_builder_path = get_foil_builder_path();
+            let builder_package_path = foil_builder_path.join(PathBuf::from("package.json"));
             let file_result = fs::File::open(&builder_package_path);
             if file_result.is_ok() {
                 let mut file = file_result.unwrap();
@@ -146,6 +138,8 @@ impl FoilMetadata {
                     if !module_exists_and_matches {
                         break;
                     }
+                } else {
+                    module_exists_and_matches &= false;
                 }
             }
             !module_exists_and_matches
@@ -155,7 +149,18 @@ impl FoilMetadata {
     }
 
     /// Verify if a given set of assets matches our foil metadata file path/modified dates. Returns true if there are changes.
-    pub fn verify(&self, foil: &Foil) -> FoilMetadataStatus {
+    pub fn verify(&self, foil: &Foil, build_mode: BuildMode) -> FoilMetadataStatus {
+        // 🏗️ If the build mode has changed, force a full rebuild.
+        if (self.mode == "release" && build_mode != BuildMode::Release)
+            || (self.mode == "development" && build_mode != BuildMode::Development)
+        {
+            return FoilMetadataStatus {
+                files_changed: true,
+                runtime_changed: true,
+                public_modules_changed: true,
+            };
+        }
+
         // 🧱 Verify if source files have changed first:
         let source_files_changed = self.verify_source_files(foil);
         // 🏎️ Verify SystemJS runtime:
@@ -163,31 +168,10 @@ impl FoilMetadata {
         // 📚 Check if public vendor modules need to be built.
         let public_modules_changed = self.verify_public_modules(foil);
 
-        // We may want to know if output files have changed:
-        // We don't check if main.css exists...
-        let default_path = PathBuf::from_str("main.js").unwrap_or_default();
-        let file_name_path = PathBuf::from_str(&foil.main).unwrap_or(default_path);
-        let file_name = file_name_path.file_name().unwrap_or(OsStr::new("main.js"));
-        let mut output_main = foil.output_path.join(file_name);
-        output_main.set_extension("js");
-        let mut output_changed = !output_main.exists();
-        for vendor in foil.public_modules.clone() {
-            let file_name_path = PathBuf::from_str(&vendor).unwrap_or_default();
-            let mut output_vendor = foil.output_path.join(file_name_path);
-            output_vendor.set_extension("js");
-            output_changed |= !output_vendor.exists();
-        }
-        if foil.frontend {
-            // Check if importmap.json exists:
-            let output_import_map = foil.output_path.join("importmap.json");
-            output_changed |= !output_import_map.exists();
-        }
-
         FoilMetadataStatus {
-            source_files_changed,
+            files_changed: source_files_changed,
             runtime_changed,
             public_modules_changed,
-            output_changed,
         }
     }
 }
@@ -199,6 +183,7 @@ pub fn write_foil_metadata(
     source_files: &Vec<FoilFile>,
     systemjs_version: &String,
     public_modules: &StringMap,
+    build_mode: BuildMode,
 ) {
     let file = fs::File::create(path).unwrap();
     let mut writer = std::io::BufWriter::new(file);
@@ -207,6 +192,12 @@ pub fn write_foil_metadata(
         files: source_files.to_vec(),
         systemjs_version: systemjs_version.to_string(),
         public_modules: public_modules.clone(),
+        mode: (if build_mode == BuildMode::Release {
+            "release"
+        } else {
+            "development"
+        })
+        .to_string(),
     };
     serde_json::to_writer(&mut writer, &metadata).unwrap();
 }

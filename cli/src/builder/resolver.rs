@@ -1,15 +1,14 @@
 use super::nodejs::find_all_imports;
-use super::package_schema::{NodeAuthor, NodePackage, StringMap};
+use super::package_schema::{FoilRedirect, NodeAuthor, NodePackage, StringMap};
 use super::static_assets::{build_static_assets, FoilFile, StaticAsset};
-use crate::{return_err, BuildMode, Result};
-use async_recursion::async_recursion;
+use crate::{return_err, Result};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
-use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::str::FromStr;
+use walkdir::{DirEntry, WalkDir};
 
 //=====================================================================================================================
 // Foil structure indexed in database.
@@ -63,114 +62,110 @@ pub struct Foil {
     pub public_modules_map: StringMap,
 
     /// The permalink glob to generate this project's RSS feed.
-    pub rss: String,
+    pub rss: Vec<String>,
+
+    /// List of redirects.
+    pub redirects: Vec<FoilRedirect>,
+}
+
+impl Foil {
+    /// Determine if the current foil project requires a build.
+    pub fn requires_build(&self) -> bool {
+        let main_path = PathBuf::from(self.main.clone());
+        let main_path_file = main_path.file_name().unwrap_or_default();
+        let main_file_path = PathBuf::from(main_path_file);
+        let main_ext = main_file_path
+            .extension()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        main_ext == "ts" || main_ext == "tsx" || main_ext == "mdx"
+    }
+
+    /// Resolve the final permalink path for this foil
+    pub fn resolve_js_main(&self) -> String {
+        let main_path = PathBuf::from(self.main.clone());
+        let main_path_file = main_path.file_name().unwrap_or_default();
+        let mut main_file_path = PathBuf::from(main_path_file);
+        main_file_path.set_extension("js");
+        let main_file_str = main_file_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+        let relative_path = self
+            .output_path
+            .strip_prefix(self.root_path.clone())
+            .unwrap();
+        let joined_path = PathBuf::from(self.permalink.clone())
+            .join(relative_path)
+            .join(PathBuf::from(main_file_str));
+        let p: String = joined_path
+            .to_str()
+            .unwrap_or("/")
+            .to_string()
+            .replace("\\", "/");
+        p
+    }
+}
+
+//=====================================================================================================================
+/// ❌ Determine if a directory entry is a foil project. Skip folders/files used when building (node_modules, target, hidden folders):
+fn is_foil_package(entry: &DirEntry) -> bool {
+    let file_name = entry.file_name().to_str().unwrap_or_default();
+    if file_name.len() <= 0
+        || file_name == "node_modules"
+        || file_name == "target"
+        || file_name.char_indices().next().unwrap().1 == '.'
+    {
+        return false;
+    }
+    true
 }
 
 //=====================================================================================================================
 /// Traverse a given folder and its files for foil projects, and process them.
-pub async fn resolve_foils(
-    path: PathBuf,
-    build_mode: BuildMode,
-    resolved_foils: &mut Vec<Foil>,
-) -> Result<()> {
+pub async fn resolve_foils(path: PathBuf, resolved_foils: &mut Vec<Foil>) -> Result<()> {
     // Recursively find all foil modules.
-    // TODO: Currently this is somewhat slow, we should debug to find out why.
-    resolve_foils_recursive(path, build_mode, resolved_foils).await?;
+    for entry in WalkDir::new(path)
+        .follow_links(true)
+        .into_iter()
+        .filter_entry(|e| is_foil_package(e))
+        .filter_map(|e| e.ok())
+    {
+        let file_name = entry.file_name().to_str().unwrap_or_default();
+        if file_name != "package.json" {
+            continue;
+        }
+        // 🌟 We've found a foil project, attempt to foilify it and process it later.
+        let cur_path_package = entry.into_path();
+        let cur_path_root = cur_path_package.parent().unwrap().to_path_buf();
+        match read_foil_package(&cur_path_package) {
+            Ok(v) => {
+                match process_foil_project(v, &cur_path_root) {
+                    Ok(resolved_foil) => {
+                        resolved_foils.push(resolved_foil);
+                    }
+                    Err(er) => {
+                        println!("Failed to process Foil project. \n{:?}", er);
+                    }
+                };
+            }
+            Err(_er) => (),
+        };
+    }
 
     // Sort them by non-frontend, then frontend.
     resolved_foils.sort_by(|a, b| {
         if a.frontend && !b.frontend {
-            Ordering::Greater
-        } else if !a.frontend && b.frontend {
             Ordering::Less
+        } else if !a.frontend && b.frontend {
+            Ordering::Greater
         } else {
             Ordering::Equal
         }
     });
 
-    Ok(())
-}
-
-//=====================================================================================================================
-/// Recurse down a given path to find Foil modules.
-#[async_recursion]
-pub async fn resolve_foils_recursive(
-    path: PathBuf,
-    build_mode: BuildMode,
-    resolved_foils: &mut Vec<Foil>,
-) -> Result<()> {
-    // 📂 Read all files in the current path.
-    let reading_dir = fs::read_dir(&path);
-    if reading_dir.is_err() {
-        println!(
-            "❌ Couldn't process current directory, skipping.\n ❌ Directory: {}",
-            &path.to_str().unwrap_or("")
-        );
-        return Ok(());
-    }
-    // 🌲 Traverse to a subdirectory if the current directory does not contain a foil package.json.
-    // As a rule, no foil directory can contain foil directories.
-    let mut files: Vec<PathBuf> = reading_dir
-        .unwrap()
-        .map(|entry| entry.unwrap().path())
-        .collect();
-    files.sort_by(|a, b| {
-        if a.is_dir() && !b.is_dir() {
-            Ordering::Greater
-        } else if !a.is_dir() && b.is_dir() {
-            Ordering::Less
-        } else {
-            {
-                Ordering::Equal
-            }
-        }
-    });
-
-    // 📂 Process all files in this folder:
-    let mut foil_folder = false;
-    for file_path in files {
-        let file_name = file_path
-            .file_name()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or_default();
-
-        // ❌ Skip folders/files used when building (node_modules, target, hidden folders):
-        if file_name.len() <= 0
-            || file_name == "node_modules"
-            || file_name == "target"
-            || file_name.char_indices().next().unwrap().1 == '.'
-        {
-            continue;
-        }
-
-        // 🌠 We've found a package.json file, but is it a Foil package?
-        if file_name == "package.json" {
-            let data = match read_foil_package(&file_path) {
-                Ok(v) => v,
-                Err(_er) => {
-                    continue;
-                }
-            };
-            // 🛑 Stop processing further subfolders if this is not a frontend module.
-            foil_folder = data.foil.frontend;
-
-            // 🌟 We've found a foil project, attempt to foilify it and process it later.
-            match process_foil_project(data, &path) {
-                Ok(resolved_foil) => {
-                    resolved_foils.push(resolved_foil);
-                }
-                Err(er) => {
-                    println!("Failed to process Foil project. \n{:?}", er);
-                    continue;
-                }
-            };
-        }
-
-        if file_path.is_dir() && !foil_folder {
-            resolve_foils_recursive(file_path.clone(), build_mode.clone(), resolved_foils).await?;
-        }
-    }
     Ok(())
 }
 
@@ -212,9 +207,12 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
         &mut assets,
     )?;
     let mut cover = "".to_string();
-    for ref asset in assets.as_slice() {
+    for asset in assets.iter() {
         let asset_path = PathBuf::from(asset.path.clone());
-        if asset_path.ends_with("cover.jpg") {
+        let mut asset_file_name = asset_path.clone();
+        asset_file_name.set_extension("");
+        let file_name = asset_file_name.file_name().unwrap_or_default();
+        if file_name == "cover" && asset_path.extension().unwrap_or_default() != "svg" {
             cover = asset.permalink.clone();
         }
     }
@@ -264,6 +262,7 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
         frontend: package.foil.frontend,
         public_modules_map,
         rss: package.foil.rss,
+        redirects: package.foil.redirects,
     };
 
     Ok(foil)

@@ -5,6 +5,7 @@ mod metadata;
 mod nodejs;
 mod package_schema;
 mod resolver;
+mod rss;
 mod static_assets;
 
 use crate::error::Result;
@@ -15,6 +16,7 @@ use metadata::{write_foil_metadata, FoilMetadata};
 use nodejs::compile_foil_main;
 pub use resolver::read_foil_package;
 use resolver::{resolve_foils, Foil};
+use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use std::process::Child;
@@ -30,7 +32,7 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     clean_database(pool.clone()).await?;
 
     let mut resolved_foils: Vec<Foil> = vec![];
-    resolve_foils(cwd, build_mode.clone(), &mut resolved_foils).await?;
+    resolve_foils(cwd, &mut resolved_foils).await?;
 
     // Process resolved foils...
     let resolved_foil_len = resolved_foils.len();
@@ -41,56 +43,58 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     }
 
     let mut build_children: Vec<Child> = vec![];
+    let mut public_module_cache: HashMap<String, Vec<String>> = HashMap::new();
     for (i, resolved_foil) in resolved_foils.iter_mut().enumerate() {
-        println!("\n👟 Processing foil {}/{}...", i + 1, &resolved_foil_len);
+        println!(
+            "\n👟 Processing {} {}/{}...",
+            &resolved_foil.title,
+            i + 1,
+            &resolved_foil_len
+        );
 
         // 🔒 Load foil-meta file and compare source file path/modified date.
         let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
         let foil_metadata = FoilMetadata::open(foil_lock_path);
 
         // 🧱 Check if foil has changed.
-        let foil_changed = foil_metadata.verify(&resolved_foil);
+        let foil_changed = foil_metadata.verify(&resolved_foil, build_mode.clone());
 
         // Recompile and update the database if there's been changes to source files.
-        let main_path = PathBuf::from(resolved_foil.main.clone());
-        let main_path_file = main_path.file_name().unwrap_or_default();
-        let mut main_file_path = PathBuf::from(main_path_file);
-        let main_ext = main_file_path
-            .extension()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
-        let is_typescript = main_ext == "ts" || main_ext == "tsx";
         if foil_changed.changed() {
-            if is_typescript {
-                let child = compile_foil_main(&resolved_foil, foil_changed, build_mode.clone())?;
-                build_children.push(child);
-                // Rewrite foil.main to relative path to permalink:
-                main_file_path.set_extension("js");
-                let main_file_str = main_file_path
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string();
-                let relative_path = resolved_foil
-                    .output_path
-                    .strip_prefix(resolved_foil.root_path.clone())
-                    .unwrap();
-                let joined_path = PathBuf::from(resolved_foil.permalink.clone())
-                    .join(relative_path)
-                    .join(PathBuf::from(main_file_str));
-                let p: String = joined_path
-                    .to_str()
-                    .unwrap_or("/")
-                    .to_string()
-                    .replace("\\", "/");
-                resolved_foil.main = p;
-            }
-
-            // Write foil post to database.
+            // 📅 Write foil post to database.
             update_foils(&resolved_foil, &resolved_foil.root_path, pool.clone()).await?;
 
-            // Write out metadata to local lock file.
+            // 🛠️ Build foil if needed.
+            if resolved_foil.requires_build() {
+                // We must inherit public modules from the root foil project.
+                let root_foil_permalink = "/".to_string();
+                if !resolved_foil.frontend {
+                    if !public_module_cache.contains_key(&root_foil_permalink) {
+                        let found: (i32, Vec<String>) = sqlx::query_as(
+                            "SELECT id, public_modules FROM posts WHERE permalink = $1",
+                        )
+                        .bind(&root_foil_permalink)
+                        .fetch_one(&pool)
+                        .await
+                        .unwrap_or((-1, vec![]));
+                        public_module_cache.insert(root_foil_permalink.clone(), found.1);
+                    }
+                    let cached_public_modules = public_module_cache.get(&root_foil_permalink);
+                    match cached_public_modules {
+                        Some(v) => {
+                            for parent_module in v {
+                                resolved_foil.public_modules.push(parent_module.to_string());
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                // Build project.
+                let child = compile_foil_main(build_mode.clone(), &resolved_foil, foil_changed)?;
+                build_children.push(child);
+            }
+
+            // 🍥 Write out metadata to local lock file.
             let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
             let systemjs_version = "=6.14.2".to_string();
             write_foil_metadata(
@@ -98,12 +102,27 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
                 &resolved_foil.source_files,
                 &systemjs_version,
                 &resolved_foil.public_modules_map,
+                build_mode.clone(),
             );
         }
     }
+
+    // 🌊 Write the RSS output for this foil project.
+    rss::build_rss(pool.clone()).await;
 
     for mut child in build_children {
         child.wait().expect("Failed to run Foil Builder...");
     }
     Ok(())
+}
+
+//=====================================================================================================================
+/// Get the builder folder path.
+pub fn get_foil_builder_path() -> PathBuf {
+    let foil_builder_path = env::current_exe()
+        .unwrap_or_default()
+        .parent()
+        .unwrap()
+        .join(PathBuf::from("builder"));
+    foil_builder_path
 }

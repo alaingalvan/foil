@@ -4,18 +4,28 @@ CREATE TYPE author AS (
     url varchar(254)
 );
 
+CREATE TYPE redirect AS (
+    path_from varchar(254),
+    path_to varchar(254)
+);
+
 CREATE TABLE IF NOT EXISTS posts (
     id serial PRIMARY KEY NOT NULL,
-    permalink varchar(64) NOT NULL UNIQUE,
+    permalink varchar(254) NOT NULL UNIQUE,
     title varchar(254) NOT NULL,
     authors author[] NOT NULL,
     description text NOT NULL,
-    keywords varchar(23)[] NOT NULL,
+    keywords varchar(254)[] NOT NULL,
     cover varchar(254) NOT NULL,
     main varchar(254) NOT NULL,
-    date_published timestamp NOT NULL,
-    date_modified timestamp NOT NULL,
-    root_path varchar(254) NOT NULL UNIQUE
+    date_published TIMESTAMPTZ NOT NULL,
+    date_modified TIMESTAMPTZ NOT NULL,
+
+    output_path varchar(254) NOT NULL,
+    root_path varchar(254) NOT NULL UNIQUE,
+    public_modules varchar(254)[] NOT NULL,
+    rss varchar(254)[] NOT NULL,
+    redirects redirect[] NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS assets (
@@ -23,3 +33,5 @@ CREATE TABLE IF NOT EXISTS assets (
     path varchar(254) NOT NULL UNIQUE,
     permalink varchar(254) NOT NULL UNIQUE
 );
+
+SET CLIENT_ENCODING TO 'utf8';

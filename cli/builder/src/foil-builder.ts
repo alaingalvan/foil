@@ -27,7 +27,6 @@ const stat = promisify(statCallback);
 // 📃 Parse Args:
 // foil-builder --root-path <path> --system --public-modules <list> --vendor --input <main> --output <dir>
 // Output is empty when successful, an error message when failing.
-console.log("✨🔨 Foil Builder (Webpack Backend)");
 
 const kebab = (str) =>
   str
@@ -95,16 +94,19 @@ for (let i = 0; i < argv.length; i++) {
 }
 
 // Fail if missing required arguments:
-if (args.rootPath.length <= 0 || args.output.length <= 0) {
+if (args.rootPath.length <= 0) {
   console.error(
     "foil-builder --root-path <path> --system --vendor --input <main> --output <dir>"
   );
   process.exit(1);
 }
-
+//=====================================================================================================================
+// Setup globals:
 const nodeEnvStr: any = args.production ? "production" : "development";
 const buildDir = args.output;
 const buildDirAbs = join(args.rootPath, buildDir);
+// TODO: Load join(args.rootPath, "tsconfig.json"), then root foil's tsconfig, then builder's tsconfig.
+const tsConfigFile = join(process.cwd(), "tsconfig.json");
 
 //=====================================================================================================================
 // 🔧 Build or watch Webpack compilation with some helpful metadata shared.
@@ -144,12 +146,10 @@ function build(title, config: Configuration) {
 //=====================================================================================================================
 // 🔧 Main builder.
 async function main() {
-  // {} Build Import Map
+  // ⚙️ Build Import Map
   if (args.inputMap) {
     const importMap = join(buildDirAbs, "importmap.json");
-    console.log("{} Building SystemJS input Map to:\n" + importMap);
-    const importMapData = `
-{
+    const importMapData = `{
   "imports": {
 ${args.publicModules.reduce(
   (acc, m, i) =>
@@ -173,9 +173,16 @@ ${args.publicModules.reduce(
     }
 
     await writeFile(importMap, importMapData, "utf8");
+
+    console.log(
+      "✔️️" +
+        green("  · Success · ") +
+        " ⚙️ SystemJS input map built to:\n" +
+        importMap
+    );
   }
 
-  // 🌄 Build SystemJS:
+  // 🌄 Build SystemJS runtime:
   if (args.system) {
     let suffix = args.production ? ".min" : "";
     await build("🌄 SystemJS", {
@@ -198,7 +205,7 @@ ${args.publicModules.reduce(
     });
   }
 
-  // 📚 Build Vendor Libraries if they've recently updated:
+  // 📚 Build vendor libraries:
   if (args.publicModules.length > 0 && args.vendor) {
     for (let m of args.publicModules) {
       let externals = args.publicModules.reduce(
@@ -219,7 +226,12 @@ ${args.publicModules.reduce(
         },
         resolve: {
           extensions: [".ts", ".tsx", ".js"],
-          modules: ["node_modules"],
+          modules: [
+            resolve(args.rootPath, "src"),
+            join(args.rootPath, "node_modules"),
+            join(process.cwd(), "node_modules"),
+            "node_modules",
+          ],
           fallback: {
             fs: false,
             tls: false,
@@ -278,7 +290,7 @@ ${args.publicModules.reduce(
     }
   }
 
-  // ✨ Build Main site
+  // ✨ Build main target:
   if (args.input.length > 0) {
     const relativeInputPath = "./" + args.input;
     const inputName =
@@ -303,7 +315,12 @@ ${args.publicModules.reduce(
       externals: args.publicModules,
       resolve: {
         extensions: [".ts", ".tsx", ".js"],
-        modules: [resolve(args.rootPath, "src"), "node_modules"],
+        modules: [
+          resolve(args.rootPath, "src"),
+          join(args.rootPath, "node_modules"),
+          join(process.cwd(), "node_modules"),
+          "node_modules",
+        ],
         fallback: {
           fs: false,
           tls: false,
@@ -314,6 +331,7 @@ ${args.publicModules.reduce(
           https: false,
           stream: false,
           crypto: false,
+          buffer: false,
         },
       },
       module: {
@@ -323,8 +341,9 @@ ${args.publicModules.reduce(
             loader: "ts-loader",
             options: {
               transpileOnly: true,
+              configFile: tsConfigFile,
               compilerOptions: {
-                module: "nodenext",
+                module: "esnext",
                 sourceMap: args.production ? false : true,
               },
             },
@@ -354,6 +373,11 @@ ${args.publicModules.reduce(
             ],
           },
           {
+            test: /\.(graphql|gql)$/,
+            exclude: /node_modules/,
+            loader: "graphql-tag/loader",
+          },
+          {
             test: [
               /\.(woff|ttf|eot|svg)(\?v=[a-z0-9]\.[a-z0-9]\.[a-z0-9])?$/,
               /\.(ttf|eot|svg)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
@@ -379,8 +403,11 @@ ${args.publicModules.reduce(
                 loader: "ts-loader",
                 options: {
                   transpileOnly: true,
+                  // At the moment, we only use the `tsconfig.json` in the builder.
+                  // Users may want to use the one in their project build directory, so we should prioritize that.
+                  configFile: join(process.cwd(), "tsconfig.json"),
                   compilerOptions: {
-                    module: "nodenext",
+                    module: "esnext",
                     sourceMap: args.production ? false : true,
                   },
                 },

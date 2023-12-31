@@ -122,6 +122,8 @@ const transformer: Transformer<Root> = ast => {
             code = code.replaceAll('{', '&#123;');
             code = code.replaceAll('}', '&#125;');
             code = code.replaceAll('\n', "{'\\n'}");
+            code = code.replaceAll('<', "{'&lt;'}");
+            code = code.replaceAll('>', "{'&gt;'}");
 
             const codeProps = `className="language-${node.lang}"`;
             const value = `<div><pre ${node.meta}><code ${codeProps}>${code}</code></pre></div>`;

@@ -1,4 +1,4 @@
-use super::package_schema::NodeAuthor;
+use super::package_schema::{FoilRedirect, NodeAuthor};
 use super::resolver::Foil;
 use crate::error::Result;
 use crate::return_err;
@@ -20,6 +20,14 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
         .unwrap()
         .to_string()
         .replace("\\", "/");
+    let output_path_str = foil
+        .output_path
+        .clone()
+        .lexiclean()
+        .to_slash()
+        .unwrap()
+        .to_string()
+        .replace("\\", "/");
 
     let found: (i32, chrono::NaiveDateTime) =
         sqlx::query_as("SELECT id, date_modified FROM posts WHERE permalink = $1")
@@ -35,11 +43,31 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
     let updating = post_id > 0;
 
     let authors_str = authors_as_sql(&foil.authors);
+    let redirects_str = redirects_as_sql(&foil.redirects);
     let query = if !updating {
-        format!("INSERT INTO posts (permalink, title, authors, description, keywords, cover, main, date_published, date_modified, root_path) VALUES ($1, $2, ARRAY[{}]::author[], $3, $4, $5, $6, $7, $8, $9)", &authors_str)
+        format!(
+            r#"
+        INSERT INTO posts 
+        (permalink, title, authors, description,
+         keywords, cover, main, date_published,
+         date_modified, output_path, root_path, public_modules,
+         rss, redirects) 
+        VALUES ($1, $2, ARRAY[{}]::author[], $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, ARRAY[{}]::redirect[])"#,
+            &authors_str, &redirects_str
+        )
     } else {
-        format!("UPDATE posts SET title = $2, authors = ARRAY[{}]::author[], description = $3, keywords = $4, cover = $5, main = $6, date_published = $7, date_modified = $8, root_path = $9 WHERE permalink = $1", &authors_str)
+        format!(
+            r#"UPDATE posts SET
+        title = $2, authors = ARRAY[{}]::author[], description = $3, 
+        keywords = $4, cover = $5, main = $6, date_published = $7, 
+        date_modified = $8, output_path = $9, root_path = $10, public_modules = $11, 
+        rss = $12, redirects = ARRAY[{}]::redirect[]
+        WHERE permalink = $1"#,
+            &authors_str, &redirects_str
+        )
     };
+
+    let resolved_main = foil.resolve_js_main();
 
     return_err!(
         sqlx::query(&query)
@@ -48,11 +76,14 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
             .bind(&foil.description)
             .bind(&foil.keywords)
             .bind(&foil.cover)
-            .bind(&foil.main)
+            .bind(&resolved_main)
             .bind(&foil.date_published)
             .bind(&foil.date_modified)
+            // Metadata
+            .bind(&output_path_str)
             .bind(&root_path_str)
-            .bind(1)
+            .bind(&foil.public_modules)
+            .bind(&foil.rss)
             .execute(&pool)
             .await,
         "Failed to insert foil post to database."
@@ -119,6 +150,19 @@ fn authors_as_sql(authors: &Vec<NodeAuthor>) -> String {
             &author.name, &author.email, &author.url
         );
         if i != authors.len() - 1 {
+            out_str += ","
+        }
+    }
+    return out_str;
+}
+
+//=====================================================================================================================
+/// Write a node author structure as SQL.
+fn redirects_as_sql(redirects: &Vec<FoilRedirect>) -> String {
+    let mut out_str = "".to_string();
+    for (i, redirect) in redirects.iter().enumerate() {
+        out_str += &format!("('{}', '{}')", &redirect.to, &redirect.from);
+        if i != redirects.len() - 1 {
             out_str += ","
         }
     }
