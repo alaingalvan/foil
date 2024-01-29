@@ -158,6 +158,8 @@ pub fn compile_foil_main(
         "--loader",
         "ts-node/esm",
         "src/foil-builder.ts",
+        "--name",
+        &resolved_foil.name,
         "--main-title",
         &resolved_foil.title,
         "--root-path",
@@ -170,8 +172,15 @@ pub fn compile_foil_main(
         compile.arg("--input");
         compile.arg(&resolved_foil.main);
     }
-    if foil_changed.runtime_changed {
-        compile.arg("--system");
+    if resolved_foil.frontend {
+        if foil_changed.runtime_changed {
+            compile.arg("--system");
+        }
+        // Output input map
+        if foil_changed.public_modules_changed {
+            compile.arg("--input-map");
+            compile.arg("--vendor");
+        }
     }
     match mode {
         BuildMode::Release => {
@@ -185,14 +194,6 @@ pub fn compile_foil_main(
 
     compile.arg("--public-modules");
     compile.args(&resolved_foil.public_modules);
-
-    // Output input map
-    if resolved_foil.frontend && foil_changed.public_modules_changed {
-        if resolved_foil.frontend {
-            compile.arg("--input-map");
-        }
-        compile.arg("--vendor");
-    }
 
     let output = compile
         .stdin(Stdio::null())

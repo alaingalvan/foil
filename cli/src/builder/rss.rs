@@ -1,41 +1,19 @@
 use std::{fs, path::PathBuf};
 
+#[cfg(windows)]
+use std::os::windows::fs::MetadataExt;
+
 use super::package_schema::NodeAuthor;
-use chrono::{DateTime, Utc};
 use rss::{
     Category, CategoryBuilder, ChannelBuilder, EnclosureBuilder, ImageBuilder, Item, ItemBuilder,
 };
-use serde_derive::Serialize;
 use sqlx::{postgres::Postgres, Pool};
 
-#[derive(Debug, Serialize, Clone, sqlx::Type)]
-#[sqlx(type_name = "_author")]
-struct Authors(Vec<NodeAuthor>);
-
-#[derive(Debug, Serialize, Clone, sqlx::FromRow)]
-struct SQLPostRss {
-    id: i32,
-    permalink: String,
-    title: String,
-    authors: Authors,
-    description: String,
-    keywords: Vec<String>,
-    rss: Vec<String>,
-    cover: String,
-    date_published: DateTime<Utc>,
-    root_path: String,
-    output_path: String,
-}
+use crate::query_post::{query_post, query_posts, SQLPost};
 
 /// Build an RSS document based on the root permalink's publicly exposed RSS subdirectories.
 pub async fn build_rss(pool: Pool<Postgres>) {
-    let root_foil_permalink = "/".to_string();
-    let found_root_post: Result<SQLPostRss, sqlx::Error> = sqlx::query_as(
-        "SELECT id, permalink, title, authors, description, keywords, rss, cover, date_published, root_path, output_path FROM posts WHERE permalink = $1",
-    )
-    .bind(&root_foil_permalink)
-    .fetch_one(&pool)
-    .await;
+    let found_root_post: Result<SQLPost, sqlx::Error> = query_post(&pool, "/".to_string()).await;
     match found_root_post {
         Err(e) => {
             if cfg!(debug_assertions) {
@@ -54,12 +32,19 @@ pub async fn build_rss(pool: Pool<Postgres>) {
                 let cat = CategoryBuilder::default().name(tag).build();
                 categories.push(cat);
             }
+            let default_cover = "".to_string();
+            let cover = root_post.covers.get(0).unwrap_or(&default_cover);
+            let cover_path = PathBuf::from(&root_post.root_path).join(cover);
+            let (width, height) = match imagesize::size(&cover_path) {
+                Ok(v) => (v.width, v.height),
+                Err(_ie) => (0, 0),
+            };
             let image = ImageBuilder::default()
-                .url(root_post.cover)
+                .url(cover)
                 .link(author.url.clone())
                 .title(root_post.title.clone())
-                .width(Some("1920".to_string()))
-                .height(Some("1080".to_string()))
+                .width(Some(width.to_string()))
+                .height(Some(height.to_string()))
                 .description(Some(root_post.title.clone()))
                 .build();
             let copyright = "Copyright ".to_string() + &author.name + " All Rights Reserved";
@@ -79,16 +64,27 @@ pub async fn build_rss(pool: Pool<Postgres>) {
 
             // 🥬 Build RSS Items:
             let mut items: Vec<Item> = vec![];
-            let found_items: Vec<SQLPostRss> = sqlx::query_as(
-                "SELECT id, permalink, title, authors, description, keywords, rss, cover, date_published, root_path, output_path FROM posts WHERE permalink LIKE '/blog/%'",
-            )
-            .fetch_all(&pool)
-            .await.unwrap_or(vec![]);
+            let found_items: Vec<SQLPost> = query_posts(&pool, "/blog/%".to_string())
+                .await
+                .unwrap_or(vec![]);
             for found_item in found_items {
-                let byte_length = "1024".to_string();
+                let cover = found_item.covers.get(0).unwrap_or(&default_cover);
+                let cover_path = PathBuf::from(&found_item.root_path).join(cover);
+
+                let byte_length = match fs::metadata(cover_path) {
+                    Ok(meta) => {
+                        #[cfg(windows)]
+                        let s = meta.file_size();
+                        #[cfg(target_os = "linux")]
+                        let s = meta.len();
+                        s
+                    }
+                    Err(_e) => 0,
+                };
+
                 let enclosure = EnclosureBuilder::default()
-                    .url(found_item.cover.clone())
-                    .length(byte_length)
+                    .url(cover)
+                    .length(byte_length.to_string())
                     .build();
                 let item_author = found_item.authors.0.get(0).unwrap_or(&default_author);
                 let mut item_categories: Vec<Category> = vec![];
@@ -110,11 +106,19 @@ pub async fn build_rss(pool: Pool<Postgres>) {
             channel.set_items(items);
 
             // Write to output path:
-            let rss_out_path = PathBuf::new().join(&root_post.root_path).join(&root_post.output_path).join("rss.xml");
-            let write_result = fs::write(rss_out_path, channel.to_string());
+            let rss_out_path = PathBuf::new()
+                .join(&root_post.root_path)
+                .join(&root_post.output_path)
+                .join("rss.xml");
+            let write_result = fs::write(&rss_out_path, channel.to_string());
             if write_result.is_err() {
                 println!("❌ Failed to write RSS output.");
                 return;
+            } else {
+                println!(
+                    "🌊 Successfully generated RSS feed to {}.",
+                    rss_out_path.to_str().unwrap_or_default()
+                );
             }
         }
     }

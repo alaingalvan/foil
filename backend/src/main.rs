@@ -5,6 +5,7 @@ mod github;
 mod graphql;
 
 use github::{github_hook, redirect};
+use glob::Pattern;
 use graphql::{graphql_handler, graphql_playground_handler, graphql_schema};
 
 use axum::{
@@ -19,8 +20,7 @@ use axum::{
 };
 use axum::{extract::State, http::uri::Uri};
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
-use std::net::SocketAddr;
-use tower_http::services::ServeDir;
+use std::{net::SocketAddr, path::PathBuf};
 type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 use sqlx::ConnectOptions;
 use sqlx::{postgres::PgConnectOptions, Pool, Postgres};
@@ -32,27 +32,128 @@ use std::env;
 use std::str::FromStr;
 use std::time::Duration;
 
+use lexiclean::Lexiclean;
+use path_slash::PathBufExt;
+
+fn clean_path_string(p: &std::path::PathBuf) -> String {
+    p.clone()
+        .lexiclean()
+        .to_slash()
+        .unwrap()
+        .to_string()
+        .replace("\\", "/")
+}
+
+/// State used for the server-side renderer and static asset router.
+#[derive(Debug, Clone)]
+struct RendererState {
+    pub client: Client,
+    pub pool: Pool<Postgres>,
+}
+
 //=====================================================================================================================
 /// Reverse proxy get requests to Node.js renderer.
 async fn handler_renderer(
-    State(client): State<Client>,
+    State(state): State<RendererState>,
     mut req: Request<Body>,
 ) -> Result<Response, StatusCode> {
     let path = req.uri().path();
-    let path_query = req
-        .uri()
-        .path_and_query()
-        .map(|v| v.as_str())
-        .unwrap_or(path);
+    let path_pathbuf = PathBuf::from(path);
+    let ext_result = path_pathbuf.extension();
+    let mut last_response = Response::<Body>::new("".into());
+    *last_response.status_mut() = StatusCode::NOT_FOUND;
 
-    let uri = format!("http://127.0.0.1:4011{}", path_query);
-    *req.uri_mut() = Uri::try_from(uri).unwrap();
+    // All paths that lack an extension are delegated to the node server-side renderer.
+    if ext_result.is_none() {
+        let path_query = req
+            .uri()
+            .path_and_query()
+            .map(|v| v.as_str())
+            .unwrap_or(path);
 
-    Ok(client
-        .request(req)
-        .await
-        .map_err(|_| StatusCode::BAD_REQUEST)?
-        .into_response())
+        let uri = format!("http://127.0.0.1:4011{}", path_query);
+        *req.uri_mut() = Uri::try_from(uri).unwrap();
+
+        return Ok(state
+            .client
+            .request(req)
+            .await
+            .map_err(|_| StatusCode::BAD_REQUEST)?
+            .into_response());
+    }
+
+    // We try to resolve paths that have an extension using what's exposed from foil modules relative to the path.
+    let mut path_ancestors = path_pathbuf.ancestors();
+    path_ancestors.next();
+    loop {
+        let ancestor = path_ancestors.next();
+        match ancestor {
+            Some(par) => {
+                let par_path_buf = par.to_path_buf();
+                let par_clean = clean_path_string(&par_path_buf);
+                let cur_query = include_str!("graphql/sql/post_recursive.sql");
+                // (Root Path, Permalink, Assets, Main)
+                let sql_result: Result<(String, String, Vec<String>, String), sqlx::Error> =
+                    sqlx::query_as(&cur_query)
+                        .bind(&par_clean)
+                        .fetch_one(&state.pool)
+                        .await;
+                match sql_result {
+                    Ok(v) => {
+                        // 🤍 Early out based on allowed paths and extensions.
+                        // We first check if the foil main is the path, then check our whitelist.
+                        let mut can_serve = v.3 == path;
+                        if !can_serve {
+                            for asset in v.2 {
+                                let full_asset_path_buf = PathBuf::from(&v.1).join(&asset);
+                                let full_asset_path = clean_path_string(&full_asset_path_buf);
+                                match Pattern::new(&full_asset_path) {
+                                    Ok(pat) => {
+                                        can_serve |= pat.matches(&path);
+                                        break;
+                                    }
+                                    Err(_) => (),
+                                }
+                            }
+                        }
+                        if !can_serve {
+                            return Ok(last_response);
+                        }
+
+                        // 🫚 Split the permalink from the current request path:
+                        // Example: /blog/ray-tracing-denoising/assets/cover.jpg becomes:
+                        // Result: asset/cover.jpg
+                        let mut cur_path_string = path.to_string().replacen(&v.1, "", 1);
+                        if cur_path_string.starts_with("/") {
+                            cur_path_string = cur_path_string.replacen("/", "", 1);
+                        }
+                        match PathBuf::from_str(&v.0) {
+                            Ok(post_root) => {
+                                let possible_file_path = post_root.join(&cur_path_string);
+                                let mut svc =
+                                    tower_http::services::ServeFile::new(possible_file_path);
+                                let svc_resp = svc.try_call(Request::new(Body::empty())).await;
+                                match svc_resp {
+                                    Err(_svc_e) => (),
+                                    Ok(re) => {
+                                        return Ok(re.into_response());
+                                    }
+                                }
+                            }
+                            Err(_e) => (),
+                        }
+                    }
+                    Err(_sql_e) => (),
+                }
+            }
+            None => {
+                break;
+            }
+        }
+    }
+
+    // We couldn't find a file due to a server error, so we 404 and redirect to the 404 frontend page:
+    return Ok(last_response);
 }
 //=====================================================================================================================
 /// Error handling for the foil server.
@@ -110,20 +211,13 @@ async fn main() {
         .await
         .expect("Fatal Error: Cannot connect to database.");
 
-    let args: Vec<String> = env::args().collect();
-    let mut serve_assets_dir = "assets";
-    if args.len() > 1 {
-        serve_assets_dir = &args[args.len() - 1];
-    }
-    println!("Using asset directory: {serve_assets_dir}");
-
-    let serve_assets = ServeDir::new(serve_assets_dir);
-
     // 🎒 Create Backend Server
+    let renderer_state = RendererState {
+        client: hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
+            .build(HttpConnector::new()),
+        pool: postgres_pool.clone(),
+    };
 
-    let client: Client =
-        hyper_util::client::legacy::Client::<(), ()>::builder(TokioExecutor::new())
-            .build(HttpConnector::new());
     let app = Router::new()
         // API Endpoints
         .route("/api/v1/github/", get(redirect).post(github_hook))
@@ -132,8 +226,6 @@ async fn main() {
             "/api/v1/graphql",
             get(graphql_playground_handler).post(graphql_handler),
         )
-        // ⚡ Frontend Assets / Backend Static Files
-        .nest_service("/assets", serve_assets)
         // ⚛️ Single Page Application HTML Template
         .fallback(get(handler_renderer))
         .layer(Extension(graphql_schema(&postgres_pool)))
@@ -145,7 +237,7 @@ async fn main() {
                 .timeout(Duration::from_secs(300))
                 .layer(TraceLayer::new_for_http()),
         )
-        .with_state(client);
+        .with_state(renderer_state);
 
     // ✨ Bind Foil Backend:
     println!("✨ Foil Backend Server running in http://localhost:4017");

@@ -4,6 +4,7 @@
 mod builder;
 mod error;
 mod misc;
+mod query_post;
 mod reset;
 mod server;
 
@@ -31,7 +32,7 @@ fn get_build_mode(default: BuildMode, sub_m: &ArgMatches) -> BuildMode {
 
 #[async_std::main]
 async fn main() -> Result<()> {
-    println!("✨ Foil CLI (v0.1.0)");
+    println!("✨ Foil CLI (v0.3.0)");
     let mut app = Command::new("✨ foil")
         .version("0.1.0")
         .about("💫 Foil's primary CLI application, provides everything needed to start and manage a foil project.")
@@ -73,7 +74,7 @@ async fn main() -> Result<()> {
             match sub_m.subcommand() {
                 Some(("start", sub_m)) => {
                     let build_mode = get_build_mode(BuildMode::Release, sub_m);
-                    start_server(build_mode.clone()).await;
+                    let _ = start_server(build_mode.clone()).await;
                 }
                 Some(("reset", _sub_m)) => {
                     let _ = reset().await;

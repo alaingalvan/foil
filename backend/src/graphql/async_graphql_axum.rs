@@ -86,6 +86,7 @@ pub struct GraphQLBatchRequest<R = rejection::GraphQLRejection>(
 impl<R> GraphQLBatchRequest<R> {
     /// Unwraps the value to `async_graphql::BatchRequest`.
     #[must_use]
+    #[allow(dead_code)]
     pub fn into_inner(self) -> async_graphql::BatchRequest {
         self.0
     }

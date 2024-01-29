@@ -3,7 +3,7 @@ pub mod build_mode;
 mod database;
 mod metadata;
 mod nodejs;
-mod package_schema;
+pub mod package_schema;
 mod resolver;
 mod rss;
 mod static_assets;
@@ -96,7 +96,7 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
 
             // 🍥 Write out metadata to local lock file.
             let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
-            let systemjs_version = "=6.14.2".to_string();
+            let systemjs_version = "=6.14.3".to_string();
             write_foil_metadata(
                 &foil_lock_path,
                 &resolved_foil.source_files,
@@ -115,14 +115,17 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     }
     Ok(())
 }
+//=====================================================================================================================
+/// Get the foil folder path.
+pub fn get_foil_folder_path() -> PathBuf {
+    let foil_exe_path = env::current_exe().unwrap_or_default();
+    let foil_folder_path = foil_exe_path.parent().unwrap();
+    foil_folder_path.to_path_buf()
+}
 
 //=====================================================================================================================
 /// Get the builder folder path.
 pub fn get_foil_builder_path() -> PathBuf {
-    let foil_builder_path = env::current_exe()
-        .unwrap_or_default()
-        .parent()
-        .unwrap()
-        .join(PathBuf::from("builder"));
+    let foil_builder_path = get_foil_folder_path().join(PathBuf::from("builder"));
     foil_builder_path
 }

@@ -1,7 +1,9 @@
-use super::package_schema::{FoilRedirect, NodeAuthor};
+use super::package_schema::NodeAuthor;
+use super::read_foil_package;
 use super::resolver::Foil;
 use crate::error::Result;
 use crate::return_err;
+use chrono::{DateTime, Utc};
 use futures::{future, StreamExt, TryStreamExt};
 use lexiclean::Lexiclean;
 use path_slash::PathBufExt;
@@ -29,41 +31,43 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
         .to_string()
         .replace("\\", "/");
 
-    let found: (i32, chrono::NaiveDateTime) =
+    // Define new datetimez:
+    let dt = Utc::now();
+    let naive_utc = dt.naive_utc();
+    let offset = dt.offset().clone();
+    let dt_new = DateTime::<Utc>::from_naive_utc_and_offset(naive_utc, offset);
+
+    let found: (i32, DateTime<Utc>) =
         sqlx::query_as("SELECT id, date_modified FROM posts WHERE permalink = $1")
             .bind(&foil.permalink)
             .fetch_one(&pool)
             .await
-            .unwrap_or((
-                -1,
-                chrono::NaiveDateTime::from_timestamp_opt(0, 0).unwrap_or_default(),
-            ));
+            .unwrap_or((-1, dt_new));
 
     let post_id: i32 = found.0;
     let updating = post_id > 0;
 
     let authors_str = authors_as_sql(&foil.authors);
-    let redirects_str = redirects_as_sql(&foil.redirects);
     let query = if !updating {
         format!(
             r#"
         INSERT INTO posts 
-        (permalink, title, authors, description,
-         keywords, cover, main, date_published,
+        (name, permalink, title, authors, description,
+         keywords, covers, main, date_published,
          date_modified, output_path, root_path, public_modules,
-         rss, redirects) 
-        VALUES ($1, $2, ARRAY[{}]::author[], $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, ARRAY[{}]::redirect[])"#,
-            &authors_str, &redirects_str
+         rss, assets) 
+        VALUES ($1, $2, $3, ARRAY[{}]::author[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
+            &authors_str
         )
     } else {
         format!(
             r#"UPDATE posts SET
-        title = $2, authors = ARRAY[{}]::author[], description = $3, 
-        keywords = $4, cover = $5, main = $6, date_published = $7, 
-        date_modified = $8, output_path = $9, root_path = $10, public_modules = $11, 
-        rss = $12, redirects = ARRAY[{}]::redirect[]
-        WHERE permalink = $1"#,
-            &authors_str, &redirects_str
+        name = $1, title = $3, authors = ARRAY[{}]::author[], description = $4, 
+        keywords = $5, covers = $6, main = $7, date_published = $8, 
+        date_modified = $9, output_path = $10, root_path = $11, public_modules = $12, 
+        rss = $13, assets = $14
+        WHERE permalink = $2"#,
+            &authors_str
         )
     };
 
@@ -71,11 +75,12 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
 
     return_err!(
         sqlx::query(&query)
+            .bind(&foil.name)
             .bind(&foil.permalink)
             .bind(&foil.title)
             .bind(&foil.description)
             .bind(&foil.keywords)
-            .bind(&foil.cover)
+            .bind(&foil.covers)
             .bind(&resolved_main)
             .bind(&foil.date_published)
             .bind(&foil.date_modified)
@@ -84,6 +89,7 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
             .bind(&root_path_str)
             .bind(&foil.public_modules)
             .bind(&foil.rss)
+            .bind(&foil.assets)
             .execute(&pool)
             .await,
         "Failed to insert foil post to database."
@@ -157,43 +163,43 @@ fn authors_as_sql(authors: &Vec<NodeAuthor>) -> String {
 }
 
 //=====================================================================================================================
-/// Write a node author structure as SQL.
-fn redirects_as_sql(redirects: &Vec<FoilRedirect>) -> String {
-    let mut out_str = "".to_string();
-    for (i, redirect) in redirects.iter().enumerate() {
-        out_str += &format!("('{}', '{}')", &redirect.to, &redirect.from);
-        if i != redirects.len() - 1 {
-            out_str += ","
-        }
-    }
-    return out_str;
-}
-
-//=====================================================================================================================
 /// 🧼 Clean the database of any stale/missing foil projects.
 pub async fn clean_database(pool: Pool<Postgres>) -> Result<()> {
     // For each foil in the database, verify its corresponding output files exist.
     // This is a matter of first checking if its metadata exists, then verifying if its `package.json` exists.
-    let clean_stream = sqlx::query("SELECT id, root_path FROM posts")
+    let clean_stream = sqlx::query("SELECT id, root_path, permalink FROM posts")
         .try_map(|row: PgRow| {
             Ok((
                 row.try_get::<i32, _>(0).unwrap_or_default(),
                 row.try_get::<String, _>(1).unwrap_or_default(),
+                row.try_get::<String, _>(2).unwrap_or_default(),
             ))
         })
         .fetch(&pool)
-        .map_ok(|(id, root_path)| match PathBuf::from_str(&root_path) {
-            Ok(p) => {
-                let package_exists = p.join("package.json").exists();
-                let meta_exists = p.join("foil-meta.json").exists();
-                if !package_exists || !meta_exists {
-                    id
-                } else {
-                    -1
+        .map_ok(
+            |(id, root_path, permalink)| match PathBuf::from_str(&root_path) {
+                Ok(p) => {
+                    let package_path = p.join("package.json");
+                    let package_exists = package_path.exists();
+                    let meta_exists = p.join("foil-meta.json").exists();
+                    if !package_exists || !meta_exists {
+                        id
+                    } else {
+                        match read_foil_package(&package_path) {
+                            Ok(pack) => {
+                                if pack.foil.permalink == permalink {
+                                    -1
+                                } else {
+                                    id
+                                }
+                            }
+                            Err(_e) => id,
+                        }
+                    }
                 }
-            }
-            _ => -1,
-        })
+                _ => -1,
+            },
+        )
         .filter(|x| future::ready(x.is_ok() && *x.as_ref().unwrap() != -1));
     let clean_ids = clean_stream.collect::<Vec<_>>().await;
     for clean_id_result in clean_ids {

@@ -1,6 +1,6 @@
 {
   "name": "@foil-cms/builder",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "✨ Foil's package builder, bundle your application runtime or build foil libraries.",
   "author": "Alain Galvan <hi@alain.xyz>",
   "license": "SEE LICENSE IN ../../license.md",
@@ -35,8 +35,8 @@
   "devDependencies": {
     "@mdx-js/react": "^3.0.0",
     "@types/isomorphic-fetch": "^0.0.39",
-    "@types/node": "^20.10.5",
-    "@types/react": "^18.2.45",
+    "@types/node": "^20.11.10",
+    "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "@types/react-redux": "^7.1.33",
     "@types/react-router": "^5.1.20",
@@ -45,7 +45,7 @@
     "cross-env": "^7.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "6.21.1",
+    "react-router-dom": "6.21.3",
     "ts-node": "^10.9.2",
     "typescript": "5.3.3"
   },
@@ -54,26 +54,25 @@
     "react": ">=16.8",
     "react-dom": ">=16.8",
     "react-router-dom": "^6.10.0",
-    "systemjs": "=6.14.2"
+    "systemjs": "=6.14.3"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.0",
-    "acorn": "^8.11.2",
+    "acorn": "^8.11.3",
     "acorn-jsx": "^5.3.2",
-    "autoprefixer": "^10.4.16",
+    "autoprefixer": "^10.4.17",
     "chalk": "5.3.0",
-    "css-loader": "^6.8.1",
+    "css-loader": "^6.9.1",
     "dependency-tree": "^10.0.9",
     "file-loader": "^6.2.0",
     "find": "^0.3.0",
-    "graphql-tag": "^2.12.6",
     "highlight.js": "^11.9.0",
     "mdast": "^3.0.0",
     "mdast-util-mdx": "^3.0.0",
-    "mini-css-extract-plugin": "^2.7.6",
+    "mini-css-extract-plugin": "^2.7.7",
     "path-browserify": "^1.0.1",
     "postcss-advanced-variables": "^3.0.1",
-    "postcss-loader": "7.3.4",
+    "postcss-loader": "8.0.0",
     "postcss-nested": "^6.0.1",
     "postcss-preset-env": "^9.3.0",
     "rehype-katex": "^7.0.0",
@@ -82,11 +81,11 @@
     "remark-math": "^6.0.0",
     "sanitize-html": "^2.11.0",
     "string-replace-loader": "^3.1.0",
-    "style-loader": "^3.3.3",
-    "systemjs": "=6.14.2",
+    "style-loader": "^3.3.4",
+    "systemjs": "=6.14.3",
     "ts-loader": "^9.5.1",
     "unified": "^11.0.4",
     "unist-util-visit": "^5.0.0",
-    "webpack": "5.89.0"
+    "webpack": "5.90.0"
   }
 }

@@ -80,33 +80,13 @@ pub struct FoilConfig {
     #[serde(default = "default_empty_str")]
     pub output_path: String,
 
-    /// React JavaScript/TypeScript file with HTML of page as default export.
-    #[serde(default = "default_empty_str")]
-    pub html: String,
-
     /// is this a Foil frontend? If so it's compiled with public modules exposed with SystemJS.
     #[serde(default = "default_false")]
     pub frontend: bool,
 
-    /// Permalink redirects, used when renaming foil posts but you need to maintain the original URL.
-    #[serde(default = "default_empty_vec")]
-    pub redirects: Vec<FoilRedirect>,
-
     /// RSS glob path to export posts from.
     #[serde(default = "default_rss_vec")]
     pub rss: Vec<String>,
-}
-
-//=====================================================================================================================
-/// File/modified date pair.
-#[derive(Clone, Serialize, Deserialize, sqlx::Type, Debug)]
-#[serde(rename_all = "camelCase")]
-#[sqlx(type_name = "redirect")]
-pub struct FoilRedirect {
-    /// Path redirecting from.
-    pub from: String,
-    /// Path redirecting to.
-    pub to: String,
 }
 
 //=====================================================================================================================
@@ -124,7 +104,7 @@ fn default_rss_vec() -> Vec<String> {
 }
 
 fn default_assets() -> Vec<String> {
-    vec!["assets/*".to_string()]
+    vec!["assets/**/*".to_string()]
 }
 
 fn default_empty_vec<T>() -> Vec<T> {

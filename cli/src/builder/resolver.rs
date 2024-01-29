@@ -1,5 +1,5 @@
 use super::nodejs::find_all_imports;
-use super::package_schema::{FoilRedirect, NodeAuthor, NodePackage, StringMap};
+use super::package_schema::{NodeAuthor, NodePackage, StringMap};
 use super::static_assets::{build_static_assets, FoilFile, StaticAsset};
 use crate::{return_err, Result};
 use chrono::{DateTime, Utc};
@@ -13,6 +13,9 @@ use walkdir::{DirEntry, WalkDir};
 //=====================================================================================================================
 // Foil structure indexed in database.
 pub struct Foil {
+    /// Package name, used for import resolution.
+    pub name: String,
+
     /// The permalink of this post, where it exists in the website.
     pub permalink: String,
 
@@ -28,8 +31,8 @@ pub struct Foil {
     /// Keywords used for search engine crawlers for this foil post.
     pub keywords: Vec<String>,
 
-    /// The cover of this foil post.
-    pub cover: String,
+    /// The covers of this foil post, sorted by compatibility (svg last, jpg first).
+    pub covers: Vec<String>,
 
     /// URL to main file for this foil project.
     pub main: String,
@@ -63,9 +66,6 @@ pub struct Foil {
 
     /// The permalink glob to generate this project's RSS feed.
     pub rss: Vec<String>,
-
-    /// List of redirects.
-    pub redirects: Vec<FoilRedirect>,
 }
 
 impl Foil {
@@ -84,22 +84,13 @@ impl Foil {
 
     /// Resolve the final permalink path for this foil
     pub fn resolve_js_main(&self) -> String {
-        let main_path = PathBuf::from(self.main.clone());
-        let main_path_file = main_path.file_name().unwrap_or_default();
-        let mut main_file_path = PathBuf::from(main_path_file);
-        main_file_path.set_extension("js");
-        let main_file_str = main_file_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
         let relative_path = self
             .output_path
             .strip_prefix(self.root_path.clone())
             .unwrap();
         let joined_path = PathBuf::from(self.permalink.clone())
             .join(relative_path)
-            .join(PathBuf::from(main_file_str));
+            .join(PathBuf::from("main.js"));
         let p: String = joined_path
             .to_str()
             .unwrap_or("/")
@@ -198,7 +189,7 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
             }
         });
 
-    // Resolve the cover or leave it as an empty string.
+    // Resolve the covers or leave it as an empty string.
     let mut assets: Vec<StaticAsset> = vec![];
     build_static_assets(
         path,
@@ -206,14 +197,29 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
         &package.foil.assets,
         &mut assets,
     )?;
-    let mut cover = "".to_string();
+    let mut covers: Vec<String> = vec![];
     for asset in assets.iter() {
         let asset_path = PathBuf::from(asset.path.clone());
         let mut asset_file_name = asset_path.clone();
         asset_file_name.set_extension("");
         let file_name = asset_file_name.file_name().unwrap_or_default();
-        if file_name == "cover" && asset_path.extension().unwrap_or_default() != "svg" {
-            cover = asset.permalink.clone();
+        let extension = asset_path.extension().unwrap_or_default();
+        if file_name == "cover"
+            && (extension == "jpg"
+                || extension == "svg"
+                || extension == "gif"
+                || extension == "png"
+                || extension == "mp4")
+        {
+            if extension == "svg" {
+                covers.push(asset.permalink.clone());
+            } else {
+                let covers_copy = covers.clone();
+                covers = vec![asset.permalink.clone()];
+                for cover in covers_copy {
+                    covers.push(cover);
+                }
+            }
         }
     }
 
@@ -243,14 +249,29 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
         authors.append(&mut package.contributors.clone());
     }
 
+    let name = if package.name.len() > 0 {
+        package.name
+    } else {
+        package
+            .foil
+            .title
+            .clone()
+            .replace("-", "")
+            .replace("  ", " ")
+            .replace(" ", "-")
+            .replace("_", "-")
+            .to_lowercase()
+    };
+
     // Finalize resolved foil for processing:
     let foil = Foil {
+        name,
         permalink: package.foil.permalink,
         title: package.foil.title,
         description: package.description,
         authors: authors,
         keywords: package.keywords,
-        cover,
+        covers,
         main: package.main,
         public_modules: package.foil.public_modules,
         date_published,
@@ -262,7 +283,6 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
         frontend: package.foil.frontend,
         public_modules_map,
         rss: package.foil.rss,
-        redirects: package.foil.redirects,
     };
 
     Ok(foil)

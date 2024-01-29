@@ -15,7 +15,7 @@ import MiniCssExtractPlugin from "mini-css-extract-plugin";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 
-import remarkCode from "./misc/remark-code.js";
+import remarkCode from "./misc/remark-code";
 import remarkMath from "remark-math";
 import remarkGfm from "remark-gfm";
 
@@ -37,6 +37,8 @@ const kebab = (str) =>
     .toLowerCase(); // convert to lower case
 
 let args = {
+  // Main name,
+  name: "",
   // Main title
   mainTitle: "",
   // Current build root folder.
@@ -107,6 +109,9 @@ const buildDir = args.output;
 const buildDirAbs = join(args.rootPath, buildDir);
 // TODO: Load join(args.rootPath, "tsconfig.json"), then root foil's tsconfig, then builder's tsconfig.
 const tsConfigFile = join(process.cwd(), "tsconfig.json");
+const mainTitle =
+  args.mainTitle.length < 1 ? parse(args.input).name : args.mainTitle;
+const libraryName = args.name.length < 1 ? kebab(mainTitle) : args.name;
 
 //=====================================================================================================================
 // 🔧 Build or watch Webpack compilation with some helpful metadata shared.
@@ -151,6 +156,9 @@ async function main() {
     const importMap = join(buildDirAbs, "importmap.json");
     const importMapData = `{
   "imports": {
+    "${libraryName}": "${
+      join(args.output, "main").replace(/\\/g, "/") + ".js"
+    }"${args.publicModules.length > 0 ? "," : ""}
 ${args.publicModules.reduce(
   (acc, m, i) =>
     acc +
@@ -208,12 +216,14 @@ ${args.publicModules.reduce(
   // 📚 Build vendor libraries:
   if (args.publicModules.length > 0 && args.vendor) {
     for (let m of args.publicModules) {
+      let web = /\/((server)|(ssr))/.exec(m) === null;
       let externals = args.publicModules.reduce(
         (prev, cur) => (m != cur ? { ...prev, [cur]: cur } : prev),
         {}
       );
-      await build("📚 " + m, {
+      await build(`📚 ${m} (${web ? "web" : "server"})`, {
         mode: nodeEnvStr,
+        target: web ? "web" : "node",
         entry: m,
         output: {
           path: buildDirAbs,
@@ -273,7 +283,7 @@ ${args.publicModules.reduce(
         externalsType: "system",
         externals,
         externalsPresets: {
-          web: true,
+          web,
         },
         devtool: args.production ? false : "inline-source-map",
         plugins: [
@@ -293,10 +303,7 @@ ${args.publicModules.reduce(
   // ✨ Build main target:
   if (args.input.length > 0) {
     const relativeInputPath = "./" + args.input;
-    const inputName =
-      args.mainTitle.length < 1 ? parse(args.input).name : args.mainTitle;
-    const libraryName = kebab(inputName);
-    await build("✨ " + inputName, {
+    await build("✨ " + mainTitle, {
       mode: nodeEnvStr,
       context: args.rootPath,
       entry: {
@@ -371,11 +378,6 @@ ${args.publicModules.reduce(
                 },
               },
             ],
-          },
-          {
-            test: /\.(graphql|gql)$/,
-            exclude: /node_modules/,
-            loader: "graphql-tag/loader",
           },
           {
             test: [

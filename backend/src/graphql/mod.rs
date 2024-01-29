@@ -48,7 +48,3 @@ pub async fn graphql_playground_handler() -> Response {
         (StatusCode::TEMPORARY_REDIRECT, [(LOCATION, "/404")]).into_response()
     }
 }
-
-pub fn err<'a, T>(msg: &'a str) -> Result<T, async_graphql::Error> {
-    Err(async_graphql::Error::new(msg))
-}

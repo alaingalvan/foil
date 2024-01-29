@@ -2,7 +2,7 @@ import { argv } from "process";
 import { dirname, isAbsolute, join, relative } from "path";
 import { existsSync, readFileSync } from "fs";
 import Find from "find";
-const { findJsDependencies } = Find;
+const { fileSync } = Find;
 import { toList } from "dependency-tree";
 
 // 📃 Parse Args:
@@ -38,7 +38,7 @@ function addDependencies(inputFile: string) {
       let filePath = dirname(inputFile);
       let fileNameTest = join(filePath, mdxImportFile);
       fileNameTest = relative(rootPath, fileNameTest);
-      let foundMDXImports = findJsDependencies(
+      let foundMDXImports = fileSync(
         new RegExp(
           "(" +
             fileNameTest +
@@ -89,12 +89,13 @@ function addDependencies(inputFile: string) {
   }
 }
 
-if (main.match(/\.((t|j)s)|(md)x?$/)) {
+if (main.match(/\.((t|j)s)|(mdx)$/)) {
   let filename = main;
   if (!isAbsolute(filename)) {
     filename = join(rootPath, filename);
   }
   if (existsSync(filename)) {
+    resolvedImportSet.add(filename);
     addDependencies(filename);
   }
 }
