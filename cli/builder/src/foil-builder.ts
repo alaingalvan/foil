@@ -11,7 +11,7 @@ const { gray, green, cyan, red } = chalk;
 import webpack, { Configuration, Compiler } from "webpack";
 const { DefinePlugin } = webpack;
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
-
+import CssMinimizerPlugin  from 'css-minimizer-webpack-plugin';
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 
@@ -445,6 +445,11 @@ ${args.publicModules.reduce(
       devtool: args.production ? false : "inline-source-map",
       optimization: {
         minimize: args.production ? true : false,
+        minimizer: [
+          // For webpack@5 you can use the `...` syntax to extend existing minimizers (i.e. `terser-webpack-plugin`), uncomment the next line
+          `...`,
+          new CssMinimizerPlugin(),
+        ],
       },
     });
   }

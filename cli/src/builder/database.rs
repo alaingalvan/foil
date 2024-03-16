@@ -72,76 +72,25 @@ pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>
     };
 
     let resolved_main = foil.resolve_js_main();
-
-    return_err!(
-        sqlx::query(&query)
-            .bind(&foil.name)
-            .bind(&foil.permalink)
-            .bind(&foil.title)
-            .bind(&foil.description)
-            .bind(&foil.keywords)
-            .bind(&foil.covers)
-            .bind(&resolved_main)
-            .bind(&foil.date_published)
-            .bind(&foil.date_modified)
-            // Metadata
-            .bind(&output_path_str)
-            .bind(&root_path_str)
-            .bind(&foil.public_modules)
-            .bind(&foil.rss)
-            .bind(&foil.assets)
-            .execute(&pool)
-            .await,
-        "Failed to insert foil post to database."
-    );
-
-    for asset in foil.assets.iter() {
-        let found: (i32, String) =
-            sqlx::query_as("SELECT id, permalink FROM assets WHERE permalink = $1")
-                .bind(&asset)
-                .fetch_one(&pool)
-                .await
-                .unwrap_or((-1, "/".to_string()));
-
-        let db_id: i32 = found.0;
-        let updating = db_id > 0;
-
-        let query = {
-            if !updating {
-                "INSERT INTO assets (permalink, path) VALUES ($1, $2)"
-            } else {
-                "UPDATE assets SET path = $2 WHERE permalink = $1"
-            }
-        };
-
-        let mut clean_asset = asset.clone();
-        if clean_asset.ends_with("*") {
-            clean_asset.remove(asset.len() - 1);
-        }
-        let cur_path: PathBuf = PathBuf::from(
-            root_path
-                .clone()
-                .join(clean_asset)
-                .lexiclean()
-                .to_slash()
-                .unwrap()
-                .to_string(),
-        );
-        let p: String = cur_path
-            .to_str()
-            .unwrap_or("/")
-            .to_string()
-            .replace("\\", "/");
-
-        return_err!(
-            sqlx::query(&query)
-                .bind(&asset)
-                .bind(&p)
-                .execute(&pool)
-                .await,
-            "Failed to insert foil post to database."
-        );
-    }
+    let res = sqlx::query(&query)
+        .bind(&foil.name)
+        .bind(&foil.permalink)
+        .bind(&foil.title)
+        .bind(&foil.description)
+        .bind(&foil.keywords)
+        .bind(&foil.covers)
+        .bind(&resolved_main)
+        .bind(&foil.date_published)
+        .bind(&foil.date_modified)
+        // Metadata
+        .bind(&output_path_str)
+        .bind(&root_path_str)
+        .bind(&foil.public_modules)
+        .bind(&foil.rss)
+        .bind(&foil.assets)
+        .execute(&pool)
+        .await;
+    return_err!(res, "Failed to insert foil post to database.");
 
     Ok(())
 }

@@ -9,7 +9,9 @@ mod reset;
 mod server;
 
 use builder::{build, BuildMode};
+use chrono::Utc;
 use clap::{arg, ArgMatches, Command};
+use lazy_static::lazy_static;
 use reset::reset;
 use server::start_server;
 use std::io::{stdout, Write};
@@ -30,9 +32,14 @@ fn get_build_mode(default: BuildMode, sub_m: &ArgMatches) -> BuildMode {
     default
 }
 
+lazy_static! {
+    static ref BUILD_DATE: String = Utc::now().format("%m/%d/%Y").to_string();
+}
+
 #[async_std::main]
 async fn main() -> Result<()> {
-    println!("✨ Foil CLI (v0.3.0)");
+    println!("✨ Foil CLI (v{})", env!("CARGO_PKG_VERSION"));
+    println!("🌃 Build {} | {}", "09b58f", BUILD_DATE.as_str());
     let mut app = Command::new("✨ foil")
         .version("0.1.0")
         .about("💫 Foil's primary CLI application, provides everything needed to start and manage a foil project.")

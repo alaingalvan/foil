@@ -21,19 +21,21 @@ use axum::{
 use axum::{extract::State, http::uri::Uri};
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
 use std::{net::SocketAddr, path::PathBuf};
-type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
+
 use sqlx::ConnectOptions;
 use sqlx::{postgres::PgConnectOptions, Pool, Postgres};
-use tower::{BoxError, ServiceBuilder};
-use tower_http::trace::TraceLayer;
+use std::time::Duration;
+use tower::{BoxError, ServiceBuilder, ServiceExt};
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 
 use std::borrow::Cow;
 use std::env;
 use std::str::FromStr;
-use std::time::Duration;
 
 use lexiclean::Lexiclean;
 use path_slash::PathBufExt;
+
+type Client = hyper_util::client::legacy::Client<HttpConnector, Body>;
 
 fn clean_path_string(p: &std::path::PathBuf) -> String {
     p.clone()
@@ -52,13 +54,29 @@ struct RendererState {
 }
 
 //=====================================================================================================================
+/// Query a given permalink's recursive post.
+async fn query_post_recursive(
+    pool: &Pool<Postgres>,
+    permalink: &String,
+) -> Result<(String, String, Vec<String>, String), sqlx::Error> {
+    let cur_query = include_str!("graphql/sql/post_recursive.sql");
+    // (Root Path, Permalink, Assets, Main)
+    let sql_result: Result<(String, String, Vec<String>, String), sqlx::Error> =
+        sqlx::query_as(&cur_query)
+            .bind(permalink)
+            .fetch_one(pool)
+            .await;
+    return sql_result;
+}
+
+//=====================================================================================================================
 /// Reverse proxy get requests to Node.js renderer.
 async fn handler_renderer(
     State(state): State<RendererState>,
     mut req: Request<Body>,
 ) -> Result<Response, StatusCode> {
-    let path = req.uri().path();
-    let path_pathbuf = PathBuf::from(path);
+    let path = req.uri().path().to_string();
+    let path_pathbuf = PathBuf::from(path.clone());
     let ext_result = path_pathbuf.extension();
     let mut last_response = Response::<Body>::new("".into());
     *last_response.status_mut() = StatusCode::NOT_FOUND;
@@ -69,20 +87,23 @@ async fn handler_renderer(
             .uri()
             .path_and_query()
             .map(|v| v.as_str())
-            .unwrap_or(path);
+            .unwrap_or(&path);
 
         let uri = format!("http://127.0.0.1:4011{}", path_query);
         *req.uri_mut() = Uri::try_from(uri).unwrap();
 
-        return Ok(state
-            .client
-            .request(req)
-            .await
-            .map_err(|_| StatusCode::BAD_REQUEST)?
-            .into_response());
+        let client_res = state.client.request(req);
+        return tokio::spawn(async move {
+            let res = client_res
+                .await
+                .map_err(|_| StatusCode::BAD_REQUEST)?
+                .into_response();
+            Ok::<_, StatusCode>(res)
+        }).await.unwrap();
     }
 
     // We try to resolve paths that have an extension using what's exposed from foil modules relative to the path.
+    // We cache queried results to speed this up.
     let mut path_ancestors = path_pathbuf.ancestors();
     path_ancestors.next();
     loop {
@@ -91,14 +112,7 @@ async fn handler_renderer(
             Some(par) => {
                 let par_path_buf = par.to_path_buf();
                 let par_clean = clean_path_string(&par_path_buf);
-                let cur_query = include_str!("graphql/sql/post_recursive.sql");
-                // (Root Path, Permalink, Assets, Main)
-                let sql_result: Result<(String, String, Vec<String>, String), sqlx::Error> =
-                    sqlx::query_as(&cur_query)
-                        .bind(&par_clean)
-                        .fetch_one(&state.pool)
-                        .await;
-                match sql_result {
+                match query_post_recursive(&state.pool, &par_clean).await {
                     Ok(v) => {
                         // 🤍 Early out based on allowed paths and extensions.
                         // We first check if the foil main is the path, then check our whitelist.
@@ -130,15 +144,12 @@ async fn handler_renderer(
                         match PathBuf::from_str(&v.0) {
                             Ok(post_root) => {
                                 let possible_file_path = post_root.join(&cur_path_string);
-                                let mut svc =
-                                    tower_http::services::ServeFile::new(possible_file_path);
-                                let svc_resp = svc.try_call(Request::new(Body::empty())).await;
-                                match svc_resp {
-                                    Err(_svc_e) => (),
-                                    Ok(re) => {
-                                        return Ok(re.into_response());
-                                    }
-                                }
+                                let svc = tower_http::services::ServeFile::new(possible_file_path);
+                                return tokio::spawn(async move {
+                                    let svc_resp = svc.oneshot(Request::new(Body::empty()));
+                                    let res = svc_resp.await.into_response();
+                                    Ok::<_, StatusCode>(res)
+                                }).await.unwrap();
                             }
                             Err(_e) => (),
                         }
@@ -190,6 +201,12 @@ async fn add_headers(req: Request<Body>, next: Next) -> Result<Response, Respons
         "referrer-policy",
         "strict-origin-when-cross-origin".parse().unwrap(),
     );
+    headers.insert(
+        "cache-control",
+        "public, max-age=604800, stale-if-error=86400"
+            .parse()
+            .unwrap(),
+    );
     headers.remove("x-powered-by");
     headers.remove("server");
     Ok(response)
@@ -235,7 +252,8 @@ async fn main() {
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_error))
                 .timeout(Duration::from_secs(300))
-                .layer(TraceLayer::new_for_http()),
+                .layer(TraceLayer::new_for_http())
+                .layer(CompressionLayer::new()),
         )
         .with_state(renderer_state);
 

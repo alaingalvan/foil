@@ -2,6 +2,7 @@
   "buildOnSave": false,
   "compileOnSave": false,
   "compilerOptions": {
+    "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "declaration": false,
     "emitDecoratorMetadata": true,
@@ -19,15 +20,15 @@
     "resolveJsonModule": true,
     "sourceMap": true,
     "strictNullChecks": false,
-    "target": "es2021",
+    "target": "es2021"
   },
+  "exclude": ["node_modules"],
+  "include": ["**/*"],
   "ts-node": {
     "esm": true,
     "experimentalResolver": true,
     "experimentalSpecifierResolution": "node",
     "files": true,
     "transpileOnly": true
-  },
-  "exclude": ["node_modules"],
-  "include": ["src/**/*"]
+  }
 }

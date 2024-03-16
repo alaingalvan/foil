@@ -1,15 +1,31 @@
-use std::{fs, path::PathBuf};
-
-#[cfg(windows)]
-use std::os::windows::fs::MetadataExt;
-
 use super::package_schema::NodeAuthor;
 use rss::{
     Category, CategoryBuilder, ChannelBuilder, EnclosureBuilder, ImageBuilder, Item, ItemBuilder,
 };
 use sqlx::{postgres::Postgres, Pool};
+use std::{fs, path::PathBuf};
 
 use crate::query_post::{query_post, query_posts, SQLPost};
+
+fn get_cover_permalink_and_path(post: &SQLPost) -> (String, PathBuf) {
+    let default_cover = "".to_string();
+    let cover = post.covers.get(0).unwrap_or(&default_cover);
+    let mut root_string = post.root_path.clone();
+    if !(root_string.ends_with("/") || root_string.ends_with("\\")) {
+        root_string += "/";
+    }
+    let cover_relative_permalink = cover.replacen(&post.permalink, "", 1);
+    let cover_rel = if cover_relative_permalink.starts_with("/") {
+        cover_relative_permalink.replacen("/", "", 1)
+    } else {
+        cover_relative_permalink.clone()
+    };
+
+    let root_path = PathBuf::from(root_string);
+    let cover_rel_path = PathBuf::from(&cover_rel);
+    let cover_path = root_path.join(cover_rel_path);
+    (cover.clone(), cover_path.clone())
+}
 
 /// Build an RSS document based on the root permalink's publicly exposed RSS subdirectories.
 pub async fn build_rss(pool: Pool<Postgres>) {
@@ -32,10 +48,8 @@ pub async fn build_rss(pool: Pool<Postgres>) {
                 let cat = CategoryBuilder::default().name(tag).build();
                 categories.push(cat);
             }
-            let default_cover = "".to_string();
-            let cover = root_post.covers.get(0).unwrap_or(&default_cover);
-            let cover_path = PathBuf::from(&root_post.root_path).join(cover);
-            let (width, height) = match imagesize::size(&cover_path) {
+            let (cover, cover_server_path) = get_cover_permalink_and_path(&root_post);
+            let (width, height) = match imagesize::size(&cover_server_path) {
                 Ok(v) => (v.width, v.height),
                 Err(_ie) => (0, 0),
             };
@@ -64,27 +78,41 @@ pub async fn build_rss(pool: Pool<Postgres>) {
 
             // 🥬 Build RSS Items:
             let mut items: Vec<Item> = vec![];
-            let found_items: Vec<SQLPost> = query_posts(&pool, "/blog/%".to_string())
-                .await
-                .unwrap_or(vec![]);
+            let permalink = "/blog/*".to_string();
+            let mut permalink_regex = "^".to_string();
+            for char in permalink.chars() {
+                let char_string = char.to_string();
+                let char_str = &char_string;
+                match char {
+                    '/' | '$' | '^' | '+' | '.' | '(' | ')' | '=' | '!' | '|' | ',' | '{' | '}'
+                    | '[' | ']' => {
+                        permalink_regex += "\\";
+                        permalink_regex += char_str;
+                    }
+                    '*' => {
+                        permalink_regex += ".*";
+                    }
+                    _ => permalink_regex += char_str,
+                }
+            }
+            permalink_regex += "$";
+            let found_items: Vec<SQLPost> =
+                query_posts(&pool, permalink_regex).await.unwrap_or(vec![]);
             for found_item in found_items {
-                let cover = found_item.covers.get(0).unwrap_or(&default_cover);
-                let cover_path = PathBuf::from(&found_item.root_path).join(cover);
-
-                let byte_length = match fs::metadata(cover_path) {
+                let (cover, cover_server_path) = get_cover_permalink_and_path(&found_item);
+                let byte_length = match fs::metadata(&cover_server_path) {
                     Ok(meta) => {
-                        #[cfg(windows)]
-                        let s = meta.file_size();
-                        #[cfg(target_os = "linux")]
                         let s = meta.len();
                         s
                     }
                     Err(_e) => 0,
                 };
-
+                let cover_ext = cover_server_path.extension().unwrap_or_default();
+                let mime = "image/".to_string() + cover_ext.to_str().unwrap_or_default();
                 let enclosure = EnclosureBuilder::default()
                     .url(cover)
                     .length(byte_length.to_string())
+                    .mime_type(mime)
                     .build();
                 let item_author = found_item.authors.0.get(0).unwrap_or(&default_author);
                 let mut item_categories: Vec<Category> = vec![];

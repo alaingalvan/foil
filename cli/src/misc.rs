@@ -21,7 +21,13 @@ pub fn get_db_url() -> String {
 pub async fn connect_db() -> Result<Pool<Postgres>> {
     // 📚 Configure Database:
     let db_url = get_db_url();
-    println!("🐘 Opening PostgreSQL connection in: {}", &db_url);
+    let db_url_public_split: Vec<&str> = db_url.split("?").collect();
+    let db_url_public = if db_url_public_split.len() >= 2 {
+        db_url_public_split[0]
+    } else {
+        &db_url
+    };
+    println!("🐘 Opening PostgreSQL connection in: {}", db_url_public);
     let postgres_pool: Pool<Postgres> = match Pool::connect(&db_url).await {
         Ok(pool) => pool,
         Err(e) => {

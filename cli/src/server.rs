@@ -58,10 +58,10 @@ pub async fn start_server(_build_mode: BuildMode) -> Result<()> {
                 .replace(":", "_")
                 .replace(" ", "_")
                 .replace(".", "_");
-            let log_file = format!("foil-backend-log-{}.txt", &date_now_string);
-            let log_file_abs = foil_log_path.clone().join(&log_file);
-            let file = File::create(log_file_abs).unwrap();
-            let stdio = Stdio::from(file);
+            let backend_log_file = format!("foil-backend-log-{}.txt", &date_now_string);
+            let backend_log_file_abs = foil_log_path.clone().join(&backend_log_file);
+            let backend_file = File::create(backend_log_file_abs).unwrap();
+            let backend_stdio = Stdio::from(backend_file);
 
             // 🌐 Spawn child processes for the server:
             let foil_database_url = get_db_url();
@@ -71,7 +71,7 @@ pub async fn start_server(_build_mode: BuildMode) -> Result<()> {
                 .env_remove("args")
                 .env(DATABASE_URL, foil_database_url)
                 .env("RUST_LOG", env::var("RUST_LOG").unwrap_or_default())
-                .stderr(stdio)
+                .stderr(backend_stdio)
                 .spawn()
                 .unwrap();
 
@@ -116,6 +116,11 @@ pub async fn start_server(_build_mode: BuildMode) -> Result<()> {
             let builder_node_modules = clean_path_string(&foil_builder_path.join("node_modules"));
             let node_path_str = builder_node_modules + ";" + &cwd_node_modules;
 
+            let renderer_log_file = format!("foil-renderer-log-{}.txt", &date_now_string);
+            let renderer_log_file_abs = foil_log_path.clone().join(&renderer_log_file);
+            let renderer_file = File::create(renderer_log_file_abs).unwrap();
+            let renderer_stdio = Stdio::from(renderer_file);
+
             let mut backend_renderer_child = process::Command::new("node")
                 .current_dir(&cwd)
                 .env("NODE_PATH", node_path_str)
@@ -124,8 +129,10 @@ pub async fn start_server(_build_mode: BuildMode) -> Result<()> {
                     "--experimental-modules",
                     "--experimental-import-meta-resolve",
                     "--no-warnings",
+                    "--trace-warnings",
                     &server_source_file_abs_str,
                 ])
+                .stderr(renderer_stdio)
                 .spawn()
                 .unwrap();
 

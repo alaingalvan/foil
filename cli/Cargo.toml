@@ -1,6 +1,6 @@
 [package]
 name = "foil_cli"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2021"
 
@@ -12,6 +12,7 @@ futures = "0.3.x"
 glob = "0.3.x"
 imagesize = "0.12.0"
 lexiclean = "0.0.1"
+lazy_static = "1.4.0"
 path-slash = "0.2.x"
 rss = "2.0.x"
 serde = "1.0.x"

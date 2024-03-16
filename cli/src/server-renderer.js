@@ -21,7 +21,14 @@ import { createServer } from "http";
 // 🐶 Create fetch Request based on node HTTP request.
 function createFetchRequest(req) {
     let origin = `http://${req.headers["host"]}`;
-    let url = new URL(req.url, origin);
+    let url = new URL("", origin);
+    try {
+        url = new URL(req.url, origin)
+    }
+    catch (e) {
+        console.error("Failed to construct URL: %s", req.url)
+    }
+
     let controller = new AbortController();
     req.on("close", () => controller.abort());
     let headers = new Headers();
