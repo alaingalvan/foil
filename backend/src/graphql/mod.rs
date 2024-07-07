@@ -19,10 +19,10 @@ pub fn queries() -> QueryPosts {
     posts::QueryPosts::default()
 }
 
-pub type FigSchema = Schema<QueryPosts, EmptyMutation, EmptySubscription>;
+pub type FoilSchema = Schema<QueryPosts, EmptyMutation, EmptySubscription>;
 
 // 📈 Create the main Foil GraphQL Schema
-pub fn graphql_schema(postgres_pool: &Pool<Postgres>) -> FigSchema {
+pub fn graphql_schema(postgres_pool: &Pool<Postgres>) -> FoilSchema {
     Schema::build(queries(), EmptyMutation, EmptySubscription)
         .data(DataLoader::new(
             FoilLoader::new(postgres_pool.clone()),
@@ -34,7 +34,7 @@ pub fn graphql_schema(postgres_pool: &Pool<Postgres>) -> FigSchema {
 
 // 📊 Main GraphQL Handler endpoint.
 #[debug_handler]
-pub async fn graphql_handler(schema: Extension<FigSchema>, req: GraphQLRequest) -> GraphQLResponse {
+pub async fn graphql_handler(schema: Extension<FoilSchema>, req: GraphQLRequest) -> GraphQLResponse {
     let gql_inner = req.into_inner();
     let gql_response = schema.execute(gql_inner).await;
     gql_response.into()

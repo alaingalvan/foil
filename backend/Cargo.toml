@@ -1,11 +1,11 @@
 [package]
 name = "foil_backend"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2021"
 
 [dependencies]
-async-graphql = { version = "6.0.11", features = [
+async-graphql = { version = "7.0.x", features = [
     "dataloader",
     "decimal",
     "chrono",
@@ -16,18 +16,14 @@ axum = "0.7.x"
 axum-macros = "0.4.x"
 chrono = { version = "0.4.x", features = ["serde"] }
 env_logger = "0.11.x"
-glob = "0.3.1"
-hex = "0.4.x"
-hmac = "0.12.x"
-hyper-util = { version = "0.1.1", features = ["full"] }
-itertools = "0.12.x"
+glob = "0.3.x"
+hyper-util = { version = "0.1.x", features = ["full"] }
+itertools = "0.13.x"
 lexiclean = "0.0.1"
 log = "0.4.x"
 path-slash = "0.2.x"
 serde = "1.0.x"
-serde_derive = "1.0.x"
 serde_json = "1.0.x"
-sha2 = "0.10.x"
 sqlx = { version = "0.7.x", features = [
     "chrono",
     "json",
@@ -37,15 +33,15 @@ sqlx = { version = "0.7.x", features = [
     "time",
     "uuid",
 ] }
-tokio = { version = "1.34.x", features = ["full"] }
-tokio-util = { version = "0.7.1", features = ["full"] }
+tokio = { version = "1.38.x", features = ["full"] }
+tokio-util = { version = "0.7.x", features = ["full"] }
 tower = { version = "0.4.x", features = [
     "limit",
     "load-shed",
     "timeout",
     "util",
 ] }
-tower-http = { version = "0.5.2", features = [
+tower-http = { version = "0.5.x", features = [
     "compression-gzip",
     "fs",
     "trace",

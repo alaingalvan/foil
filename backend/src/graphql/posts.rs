@@ -2,7 +2,6 @@ use crate::clean_path_string;
 use async_graphql::dataloader::Loader;
 use async_graphql::futures_util::TryStreamExt;
 use async_graphql::{Context, FieldError, Object, Result, SimpleObject};
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use log::error;
@@ -77,7 +76,7 @@ pub struct SQLPost {
     pub date_modified: DateTime<Utc>,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(Hash, Eq, PartialEq, Clone)]
 struct PostId(i32);
 impl std::fmt::Display for PostId {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -97,7 +96,7 @@ impl FoilLoader {
     }
 }
 
-#[async_trait]
+
 impl Loader<PostId> for FoilLoader {
     type Value = Post;
     type Error = FieldError;

@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use std::process::Child;
+use std::time::Instant;
 
 //=====================================================================================================================
 /// Process the current working directory for Foil projects.
@@ -28,11 +29,14 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     let pool = connect_db().await?;
     let cwd = env::current_dir().unwrap_or_default();
 
+    // ⏳ Start build benchmark:
+    let now = Instant::now();
+
     // 🧼🫧 Clean the database and remove any currently missing foils.
     clean_database(pool.clone()).await?;
 
-    let mut resolved_foils: Vec<Foil> = vec![];
-    resolve_foils(cwd, &mut resolved_foils).await?;
+    let mut resolved_foils: Vec<(Foil, FoilMetadata)> = vec![];
+    resolve_foils(cwd, &mut resolved_foils)?;
 
     // Process resolved foils...
     let resolved_foil_len = resolved_foils.len();
@@ -44,17 +48,13 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
 
     let mut build_children: Vec<Child> = vec![];
     let mut public_module_cache: HashMap<String, Vec<String>> = HashMap::new();
-    for (i, resolved_foil) in resolved_foils.iter_mut().enumerate() {
+    for (i, (resolved_foil, foil_metadata)) in resolved_foils.iter_mut().enumerate() {
         println!(
             "\n👟 Processing {} {}/{}...",
             &resolved_foil.title,
             i + 1,
             &resolved_foil_len
         );
-
-        // 🔒 Load foil-meta file and compare source file path/modified date.
-        let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
-        let foil_metadata = FoilMetadata::open(foil_lock_path);
 
         // 🧱 Check if foil has changed.
         let foil_changed = foil_metadata.verify(&resolved_foil, build_mode.clone());
@@ -113,6 +113,8 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     for mut child in build_children {
         child.wait().expect("Failed to run Foil Builder...");
     }
+    let elapsed = now.elapsed();
+    println!("⏲️ Build time: {:.2?}", elapsed);
     Ok(())
 }
 //=====================================================================================================================

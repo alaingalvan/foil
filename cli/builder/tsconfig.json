@@ -23,7 +23,7 @@
     "target": "es2021"
   },
   "exclude": ["node_modules"],
-  "include": ["**/*"],
+  "include": ["src/**/*"],
   "ts-node": {
     "esm": true,
     "experimentalResolver": true,

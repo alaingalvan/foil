@@ -1,3 +1,4 @@
+use super::metadata::FoilMetadata;
 use super::nodejs::find_all_imports;
 use super::package_schema::{NodeAuthor, NodePackage, StringMap};
 use super::static_assets::{build_static_assets, FoilFile, StaticAsset};
@@ -116,7 +117,10 @@ fn is_foil_package(entry: &DirEntry) -> bool {
 
 //=====================================================================================================================
 /// Traverse a given folder and its files for foil projects, and process them.
-pub async fn resolve_foils(path: PathBuf, resolved_foils: &mut Vec<Foil>) -> Result<()> {
+pub fn resolve_foils(
+    path: PathBuf,
+    resolved_foils: &mut Vec<(Foil, FoilMetadata)>,
+) -> Result<()> {
     // Recursively find all foil modules.
     for entry in WalkDir::new(path)
         .follow_links(true)
@@ -128,29 +132,33 @@ pub async fn resolve_foils(path: PathBuf, resolved_foils: &mut Vec<Foil>) -> Res
         if file_name != "package.json" {
             continue;
         }
-        // 🌟 We've found a foil project, attempt to foilify it and process it later.
         let cur_path_package = entry.into_path();
         let cur_path_root = cur_path_package.parent().unwrap().to_path_buf();
+
+
+        // 🌟 We've found a foil project, attempt to foilify it and process it later.
         match read_foil_package(&cur_path_package) {
             Ok(v) => {
                 match process_foil_project(v, &cur_path_root) {
                     Ok(resolved_foil) => {
-                        resolved_foils.push(resolved_foil);
+                        // 🔒 Load foil-meta file and compare source file path/modified date.
+                        let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
+                        let foil_metadata = FoilMetadata::open(foil_lock_path);
+                        resolved_foils.push((resolved_foil, foil_metadata));
                     }
-                    Err(er) => {
-                        println!("Failed to process Foil project. \n{:?}", er);
-                    }
+                    Err(_er) => ()
                 };
             }
-            Err(_er) => (),
+            Err(_er) => ()
         };
+
     }
 
     // Sort them by non-frontend, then frontend.
     resolved_foils.sort_by(|a, b| {
-        if a.frontend && !b.frontend {
+        if a.0.frontend && !b.0.frontend {
             Ordering::Less
-        } else if !a.frontend && b.frontend {
+        } else if !a.0.frontend && b.0.frontend {
             Ordering::Greater
         } else {
             Ordering::Equal

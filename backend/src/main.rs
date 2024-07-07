@@ -1,10 +1,8 @@
 #![warn(unused_extern_crates)]
 #![warn(unused_crate_dependencies)]
 
-mod github;
 mod graphql;
 
-use github::{github_hook, redirect};
 use glob::Pattern;
 use graphql::{graphql_handler, graphql_playground_handler, graphql_schema};
 
@@ -190,6 +188,7 @@ async fn handle_error(error: BoxError) -> impl IntoResponse {
 //=====================================================================================================================
 /// Add default headers to most responses.
 async fn add_headers(req: Request<Body>, next: Next) -> Result<Response, Response> {
+    let path = req.uri().clone().path().to_string();
     let mut response = next.run(req).await;
     let headers = response.headers_mut();
     headers.insert("x-download-options", "noopen".parse().unwrap());
@@ -201,12 +200,19 @@ async fn add_headers(req: Request<Body>, next: Next) -> Result<Response, Respons
         "referrer-policy",
         "strict-origin-when-cross-origin".parse().unwrap(),
     );
-    headers.insert(
-        "cache-control",
-        "public, max-age=604800, stale-if-error=86400"
-            .parse()
-            .unwrap(),
-    );
+
+
+    let path_pathbuf = PathBuf::from(path.clone());
+    let ext_result = path_pathbuf.extension();
+    if ext_result.is_some_and(|x| !(x == "js" || x == "css"))
+    {
+        headers.insert(
+            "cache-control",
+            "public, max-age=86400, stale-if-error=3600"
+                .parse()
+                .unwrap(),
+        );
+    }
     headers.remove("x-powered-by");
     headers.remove("server");
     Ok(response)
@@ -236,8 +242,6 @@ async fn main() {
     };
 
     let app = Router::new()
-        // API Endpoints
-        .route("/api/v1/github/", get(redirect).post(github_hook))
         // 📊 GraphQL
         .route(
             "/api/v1/graphql",
