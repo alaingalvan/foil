@@ -3,6 +3,7 @@ use super::read_foil_package;
 use super::resolver::Foil;
 use crate::error::Result;
 use crate::return_err;
+use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use futures::{future, StreamExt, TryStreamExt};
 use lexiclean::Lexiclean;
@@ -14,85 +15,88 @@ use std::str::FromStr;
 
 //=====================================================================================================================
 /// Update the database with a given foil post.
-pub async fn update_foils(foil: &Foil, root_path: &PathBuf, pool: Pool<Postgres>) -> Result<()> {
-    let root_path_str = root_path
-        .clone()
-        .lexiclean()
-        .to_slash()
-        .unwrap()
-        .to_string()
-        .replace("\\", "/");
-    let output_path_str = foil
-        .output_path
-        .clone()
-        .lexiclean()
-        .to_slash()
-        .unwrap()
-        .to_string()
-        .replace("\\", "/");
+pub async fn udpate_foil_db(foil: Foil, pool: Pool<Postgres>) -> JoinHandle<Result<()>> {
+    spawn(async move {
+        let root_path_str = foil
+            .root_path
+            .clone()
+            .lexiclean()
+            .to_slash()
+            .unwrap()
+            .to_string()
+            .replace("\\", "/");
+        let output_path_str = foil
+            .output_path
+            .clone()
+            .lexiclean()
+            .to_slash()
+            .unwrap()
+            .to_string()
+            .replace("\\", "/");
 
-    // Define new datetimez:
-    let dt = Utc::now();
-    let naive_utc = dt.naive_utc();
-    let offset = dt.offset().clone();
-    let dt_new = DateTime::<Utc>::from_naive_utc_and_offset(naive_utc, offset);
+        // Define new datetimez:
+        let dt = Utc::now();
+        let naive_utc = dt.naive_utc();
+        let offset = dt.offset().clone();
+        let dt_new = DateTime::<Utc>::from_naive_utc_and_offset(naive_utc, offset);
 
-    let found: (i32, DateTime<Utc>) =
-        sqlx::query_as("SELECT id, date_modified FROM posts WHERE permalink = $1")
-            .bind(&foil.permalink)
-            .fetch_one(&pool)
-            .await
-            .unwrap_or((-1, dt_new));
+        let found: (i32, DateTime<Utc>) =
+            sqlx::query_as("SELECT id, date_modified FROM posts WHERE permalink = $1")
+                .bind(&foil.permalink)
+                .fetch_one(&pool)
+                .await
+                .unwrap_or((-1, dt_new));
 
-    let post_id: i32 = found.0;
-    let updating = post_id > 0;
+        let post_id: i32 = found.0;
+        let updating = post_id > 0;
 
-    let authors_str = authors_as_sql(&foil.authors);
-    let query = if !updating {
-        format!(
-            r#"
+        let authors_str = authors_as_sql(&foil.authors);
+        let query = if !updating {
+            format!(
+                r#"
         INSERT INTO posts 
         (name, permalink, title, authors, description,
          keywords, covers, main, date_published,
          date_modified, output_path, root_path, public_modules,
          rss, assets) 
         VALUES ($1, $2, $3, ARRAY[{}]::author[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
-            &authors_str
-        )
-    } else {
-        format!(
-            r#"UPDATE posts SET
+                &authors_str
+            )
+        } else {
+            format!(
+                r#"UPDATE posts SET
         name = $1, title = $3, authors = ARRAY[{}]::author[], description = $4, 
         keywords = $5, covers = $6, main = $7, date_published = $8, 
         date_modified = $9, output_path = $10, root_path = $11, public_modules = $12, 
         rss = $13, assets = $14
         WHERE permalink = $2"#,
-            &authors_str
-        )
-    };
+                &authors_str
+            )
+        };
 
-    let resolved_main = foil.resolve_js_main();
-    let res = sqlx::query(&query)
-        .bind(&foil.name)
-        .bind(&foil.permalink)
-        .bind(&foil.title)
-        .bind(&foil.description)
-        .bind(&foil.keywords)
-        .bind(&foil.covers)
-        .bind(&resolved_main)
-        .bind(&foil.date_published)
-        .bind(&foil.date_modified)
-        // Metadata
-        .bind(&output_path_str)
-        .bind(&root_path_str)
-        .bind(&foil.public_modules)
-        .bind(&foil.rss)
-        .bind(&foil.assets)
-        .execute(&pool)
-        .await;
-    return_err!(res, "Failed to insert foil post to database.");
+        let resolved_main = foil.resolve_js_main();
+        let res = sqlx::query(&query)
+            .bind(&foil.name)
+            .bind(&foil.permalink)
+            .bind(&foil.title)
+            .bind(&foil.description)
+            .bind(&foil.keywords)
+            .bind(&foil.covers)
+            .bind(&resolved_main)
+            .bind(&foil.date_published)
+            .bind(&foil.date_modified)
+            // Metadata
+            .bind(&output_path_str)
+            .bind(&root_path_str)
+            .bind(&foil.public_modules)
+            .bind(&foil.rss)
+            .bind(&foil.assets)
+            .execute(&pool)
+            .await;
+        return_err!(res, "Failed to insert foil post to database.");
 
-    Ok(())
+        Ok(())
+    })
 }
 
 //=====================================================================================================================

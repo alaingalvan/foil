@@ -16,7 +16,7 @@ use reset::reset;
 use server::start_server;
 use std::io::{stdout, Write};
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 fn get_build_mode(default: BuildMode, sub_m: &ArgMatches) -> BuildMode {
     if let Some(v) = sub_m.get_one::<bool>("release") {
@@ -39,7 +39,12 @@ lazy_static! {
 #[async_std::main]
 async fn main() -> Result<()> {
     println!("✨ Foil CLI (v{})", env!("CARGO_PKG_VERSION"));
-    println!("🌃 Build {} | {}", "09b58f", env!("BUILD_TIME"));
+    println!(
+        "🌃 Build {} | {} | {}",
+        env!("BUILD_GIT_BRANCH"),
+        env!("BUILD_GIT_COMMIT"),
+        env!("BUILD_TIME")
+    );
     let mut app = Command::new("✨ foil")
         .version("0.1.0")
         .about("💫 Foil's primary CLI application, provides everything needed to start and manage a foil project.")

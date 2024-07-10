@@ -1,12 +1,12 @@
-use serde_derive::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::{fs, io::Read};
-
 use super::get_foil_builder_path;
 use super::package_schema::StringMap;
 use super::resolver::Foil;
 use super::static_assets::FoilFile;
 use crate::BuildMode;
+use async_std::task::{spawn, JoinHandle};
+use serde_derive::{Deserialize, Serialize};
+use std::path::PathBuf;
+use std::{fs, io::Read};
 
 //=====================================================================================================================
 /// Metadata for a given foil project.
@@ -178,26 +178,28 @@ impl FoilMetadata {
 
 //=====================================================================================================================
 /// Write a foil project's corresponding metadata file, used to determine is there's been changes to the project.
-pub fn write_foil_metadata(
-    path: &PathBuf,
-    source_files: &Vec<FoilFile>,
-    systemjs_version: &String,
-    public_modules: &StringMap,
+pub async fn write_foil_metadata(
+    path: PathBuf,
+    source_files: Vec<FoilFile>,
+    systemjs_version: String,
+    public_modules: StringMap,
     build_mode: BuildMode,
-) {
-    let file = fs::File::create(path).unwrap();
-    let mut writer = std::io::BufWriter::new(file);
-    let metadata = FoilMetadata {
-        version: 0,
-        files: source_files.to_vec(),
-        systemjs_version: systemjs_version.to_string(),
-        public_modules: public_modules.clone(),
-        mode: (if build_mode == BuildMode::Release {
-            "release"
-        } else {
-            "development"
-        })
-        .to_string(),
-    };
-    serde_json::to_writer(&mut writer, &metadata).unwrap();
+) -> JoinHandle<()> {
+    spawn(async move {
+        let file = fs::File::create(path).unwrap();
+        let mut writer = std::io::BufWriter::new(file);
+        let metadata = FoilMetadata {
+            version: 0,
+            files: source_files.to_vec(),
+            systemjs_version: systemjs_version.to_string(),
+            public_modules: public_modules.clone(),
+            mode: (if build_mode == BuildMode::Release {
+                "release"
+            } else {
+                "development"
+            })
+            .to_string(),
+        };
+        serde_json::to_writer(&mut writer, &metadata).unwrap();
+    })
 }

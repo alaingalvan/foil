@@ -2,7 +2,8 @@ use super::metadata::FoilMetadata;
 use super::nodejs::find_all_imports;
 use super::package_schema::{NodeAuthor, NodePackage, StringMap};
 use super::static_assets::{build_static_assets, FoilFile, StaticAsset};
-use crate::{return_err, Result};
+use crate::Result;
+use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
 use std::fs::File;
@@ -13,6 +14,7 @@ use walkdir::{DirEntry, WalkDir};
 
 //=====================================================================================================================
 // Foil structure indexed in database.
+#[derive(Clone)]
 pub struct Foil {
     /// Package name, used for import resolution.
     pub name: String,
@@ -114,13 +116,38 @@ fn is_foil_package(entry: &DirEntry) -> bool {
     }
     true
 }
+//=====================================================================================================================
+/// Traverse a given folder and its files for foil projects, and process them.
+pub async fn resolve_foil(cur_path_package: PathBuf) -> JoinHandle<Option<(Foil, FoilMetadata)>> {
+    spawn(async move {
+        let cur_path_root = cur_path_package.parent().unwrap().to_path_buf();
+
+        // 🌟 We've found a foil project, attempt to foilify it and process it later.
+        match read_foil_package(&cur_path_package) {
+            Ok(v) => {
+                match process_foil_project(v, &cur_path_root) {
+                    Ok(resolved_foil) => {
+                        // 🔒 Load foil-meta file and compare source file path/modified date.
+                        let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
+                        let foil_metadata = FoilMetadata::open(foil_lock_path);
+                        return Some((resolved_foil, foil_metadata));
+                    }
+                    Err(_er) => (),
+                };
+            }
+            Err(_er) => (),
+        };
+        None
+    })
+}
 
 //=====================================================================================================================
 /// Traverse a given folder and its files for foil projects, and process them.
-pub fn resolve_foils(
+pub async fn resolve_foils(
     path: PathBuf,
     resolved_foils: &mut Vec<(Foil, FoilMetadata)>,
 ) -> Result<()> {
+    let mut resolved_foil_futures = vec![];
     // Recursively find all foil modules.
     for entry in WalkDir::new(path)
         .follow_links(true)
@@ -132,29 +159,21 @@ pub fn resolve_foils(
         if file_name != "package.json" {
             continue;
         }
-        let cur_path_package = entry.into_path();
-        let cur_path_root = cur_path_package.parent().unwrap().to_path_buf();
 
+        resolved_foil_futures.push(resolve_foil(entry.into_path()));
+    }
 
-        // 🌟 We've found a foil project, attempt to foilify it and process it later.
-        match read_foil_package(&cur_path_package) {
-            Ok(v) => {
-                match process_foil_project(v, &cur_path_root) {
-                    Ok(resolved_foil) => {
-                        // 🔒 Load foil-meta file and compare source file path/modified date.
-                        let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
-                        let foil_metadata = FoilMetadata::open(foil_lock_path);
-                        resolved_foils.push((resolved_foil, foil_metadata));
-                    }
-                    Err(_er) => ()
-                };
-            }
-            Err(_er) => ()
-        };
-
+    // Join threads:
+    let joined_futures = futures::future::join_all(resolved_foil_futures).await;
+    for foil_future in joined_futures {
+        match foil_future.await {
+            Some(v) => resolved_foils.push(v),
+            None => (),
+        }
     }
 
     // Sort them by non-frontend, then frontend.
+    // TODO: They should be sorted by depth, and frontend deprecated.
     resolved_foils.sort_by(|a, b| {
         if a.0.frontend && !b.0.frontend {
             Ordering::Less
@@ -299,17 +318,26 @@ fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
 //=====================================================================================================================
 /// Read a given file as a foil package.
 pub fn read_foil_package(file_path: &PathBuf) -> Result<NodePackage> {
-    let file = return_err!(
-        File::open(&file_path),
-        "Failed to open file path to 'package.json'."
-    );
+    let file = match File::open(&file_path) {
+        Ok(v) => v,
+        Err(e) => {
+            println!("{:?}", e);
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Failed to open file path to 'package.json'.",
+            )));
+        }
+    };
     let reader = BufReader::new(file);
     let data: NodePackage = match serde_json::from_reader(reader) {
         Ok(v) => v,
         Err(_er) => {
             // TODO: We should probably leave this to some verbose mode...
             println!("Failed to parse package.json, skipping. {:?}", _er);
-            return crate::error::err("Failed to deserialize node package from 'package.json");
+            return Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Failed to parse package.json, skipping.",
+            )));
         }
     };
     Ok(data)
