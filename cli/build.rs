@@ -4,7 +4,8 @@ use std::process::Command;
 fn main() {
     // ⌚ Build time:
     let cur_time = Utc::now();
-    println!("cargo::rustc-env=BUILD_TIME={}", cur_time);
+    let cur_time_str = cur_time.format("%Y-%m-%dT%H:%MZ");
+    println!("cargo::rustc-env=BUILD_TIME={}", cur_time_str);
 
     // 🌳 Current branch:
     let cur_branch = Command::new("git")

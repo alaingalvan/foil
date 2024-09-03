@@ -35,8 +35,8 @@
   "devDependencies": {
     "@mdx-js/react": "^3.0.1",
     "@types/isomorphic-fetch": "^0.0.39",
-    "@types/node": "^20.14.9",
-    "@types/react": "^18.3.3",
+    "@types/node": "^22.5.2",
+    "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@types/react-redux": "^7.1.33",
     "@types/react-router": "^5.1.20",
@@ -45,9 +45,9 @@
     "cross-env": "^7.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "6.24.0",
+    "react-router-dom": "6.26.1",
     "ts-node": "^10.9.2",
-    "typescript": "5.5.2"
+    "typescript": "5.5.4"
   },
   "peerDependencies": {
     "@mdx-js/react": ">=2.3.0",
@@ -58,25 +58,25 @@
   },
   "dependencies": {
     "@mdx-js/loader": "^3.0.1",
-    "acorn": "^8.12.0",
+    "acorn": "^8.12.1",
     "acorn-jsx": "^5.3.2",
-    "autoprefixer": "^10.4.19",
+    "autoprefixer": "^10.4.20",
     "chalk": "5.3.0",
     "css-loader": "^7.1.2",
     "css-minimizer-webpack-plugin": "^7.0.0",
     "dependency-tree": "^11.0.1",
     "file-loader": "^6.2.0",
     "find": "^0.3.0",
-    "highlight.js": "^11.9.0",
+    "highlight.js": "^11.10.0",
     "mdast": "^3.0.0",
     "mdast-util-mdx": "^3.0.0",
-    "mini-css-extract-plugin": "^2.9.0",
+    "mini-css-extract-plugin": "^2.9.1",
     "path-browserify": "^1.0.1",
     "postcss-advanced-variables": "^4.0.0",
     "postcss-loader": "8.1.1",
-    "postcss-nested": "^6.0.1",
-    "postcss-preset-env": "^9.5.15",
-    "rehype-katex": "^7.0.0",
+    "postcss-nested": "^6.2.0",
+    "postcss-preset-env": "^10.0.2",
+    "rehype-katex": "^7.0.1",
     "rehype-slug": "^6.0.0",
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
@@ -87,6 +87,6 @@
     "ts-loader": "^9.5.1",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.0.0",
-    "webpack": "5.92.1"
+    "webpack": "5.94.0"
   }
 }

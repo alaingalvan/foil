@@ -52,33 +52,23 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     let mut public_module_cache: HashMap<String, Vec<String>> = HashMap::new();
     let root_foil_permalink = "/".to_string();
     for (i, (resolved_foil, foil_metadata)) in resolved_foils.iter_mut().enumerate() {
-        println!(
-            "\n👟 Processing {} {}/{}...",
-            &resolved_foil.title,
-            i + 1,
-            &resolved_foil_len
-        );
-
         // 🧱 Check if foil has changed.
         let foil_changed = foil_metadata.verify(&resolved_foil, build_mode.clone());
 
         // Recompile and update the database if there's been changes to source files.
         if foil_changed.changed() {
+            println!(
+                "\n👟 Processing {} {}/{}...",
+                &resolved_foil.title,
+                i + 1,
+                &resolved_foil_len
+            );
             // 📅 Write foil post to database.
             let update_future = udpate_foil_db(resolved_foil.clone(), pool.clone());
 
             // ⏳ Only wait for frontend posts.
             if resolved_foil.frontend {
                 let _ = update_future.await;
-                if !public_module_cache.contains_key(&root_foil_permalink) {
-                    let found: (i32, Vec<String>) =
-                        sqlx::query_as("SELECT id, public_modules FROM posts WHERE permalink = $1")
-                            .bind(&root_foil_permalink)
-                            .fetch_one(&pool)
-                            .await
-                            .unwrap_or((-1, vec![]));
-                    public_module_cache.insert(root_foil_permalink.clone(), found.1);
-                }
             } else {
                 update_futures.push(update_future);
             }
@@ -87,6 +77,16 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
             if resolved_foil.requires_build() {
                 // We must inherit public modules from the root foil project.
                 if !resolved_foil.frontend {
+                    if !public_module_cache.contains_key(&root_foil_permalink) {
+                        let found: (i32, Vec<String>) = sqlx::query_as(
+                            "SELECT id, public_modules FROM posts WHERE permalink = $1",
+                        )
+                        .bind(&root_foil_permalink)
+                        .fetch_one(&pool)
+                        .await
+                        .unwrap_or((-1, vec![]));
+                        public_module_cache.insert(root_foil_permalink.clone(), found.1);
+                    }
                     let cached_public_modules = public_module_cache.get(&root_foil_permalink);
                     match cached_public_modules {
                         Some(v) => {
@@ -104,7 +104,7 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
 
             // 🍥 Write out metadata to local lock file.
             let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
-            let systemjs_version = "=6.14.3".to_string();
+            let systemjs_version = "=6.15.1".to_string();
             let write_future = write_foil_metadata(
                 foil_lock_path,
                 resolved_foil.source_files.clone(),

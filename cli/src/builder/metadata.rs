@@ -109,7 +109,7 @@ impl FoilMetadata {
                     };
                     let current_systemjs_version = match data["dependencies"]["systemjs"].clone() {
                         serde_json::Value::String(s) => s,
-                        _ => "=6.14.2".to_string(),
+                        _ => "=6.15.1".to_string(),
                     };
                     return self.systemjs_version != current_systemjs_version
                         || !system_path.exists();

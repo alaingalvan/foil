@@ -1,6 +1,6 @@
 [package]
 name = "foil_backend"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2021"
 

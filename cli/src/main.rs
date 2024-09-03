@@ -39,12 +39,14 @@ lazy_static! {
 #[async_std::main]
 async fn main() -> Result<()> {
     println!("✨ Foil CLI (v{})", env!("CARGO_PKG_VERSION"));
-    println!(
-        "🌃 Build {} | {} | {}",
-        env!("BUILD_GIT_BRANCH"),
-        env!("BUILD_GIT_COMMIT"),
-        env!("BUILD_TIME")
-    );
+    if cfg!(dev) {
+        println!(
+            "🌃 Build {} | {} | {}",
+            env!("BUILD_GIT_BRANCH"),
+            env!("BUILD_GIT_COMMIT"),
+            env!("BUILD_TIME")
+        );
+    }
     let mut app = Command::new("✨ foil")
         .version("0.1.0")
         .about("💫 Foil's primary CLI application, provides everything needed to start and manage a foil project.")
