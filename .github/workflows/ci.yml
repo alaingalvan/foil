@@ -9,7 +9,7 @@ env:
 
 jobs:
   build_cli:
-    name: Foil CLI - latest
+    name: Foil CLI
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -18,14 +18,12 @@ jobs:
       matrix:
         toolchain:
           - stable
-          - beta
-          - nightly
     steps:
       - uses: actions/checkout@v4
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - run: cargo build --verbose --features buildinfo
   build_backend:
-    name: Foil Backend - latest
+    name: Foil Backend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,9 +32,21 @@ jobs:
       matrix:
         toolchain:
           - stable
-          - beta
-          - nightly
     steps:
       - uses: actions/checkout@v4
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - run: cargo build --verbose
+  build_builder:
+    name: Foil Builder
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./cli/builder
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+      - run: npm ci
+      - run: npm start
