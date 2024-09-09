@@ -3,7 +3,7 @@
 # <a href="https://alain.xyz/libraries/foil"><img alt="Foil" src="docs/foil-logo.svg" /></a>
 
 [![License][license-img]][license-url]
-[![Unit Tests][travis-img]][travis-url]
+[![Unit Tests][actions-img]][actions-url]
 
 </div>
 
@@ -37,5 +37,5 @@ foil-cli server start
 
 [license-img]: https://img.shields.io/:license-mit-blue.svg?style=flat-square
 [license-url]: https://opensource.org/license/mit/
-[travis-img]: https://img.shields.io/travis/com/alaingalvan/foil.svg?style=flat-square
-[travis-url]:https://www.travis-ci.com/github/alaingalvan/foil
+[actions-img]: https://img.shields.io/github/actions/workflow/status/alaingalvan/foil/ci.yml?style=flat-square
+[actions-url]: https://github.com/alaingalvan/foil/actions/
