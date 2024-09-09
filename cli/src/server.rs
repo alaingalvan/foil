@@ -143,7 +143,9 @@ pub async fn start_server(_build_mode: BuildMode) -> Result<()> {
                 .wait()
                 .expect("❌ Failed to run Foil Backend...");
         }
-        _ => (),
+        Err(e) => {
+            println!("Failed to connect to database when starting server.\n{}", e);
+        },
     };
     Ok(())
 }

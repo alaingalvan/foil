@@ -12,7 +12,7 @@
   "module": "dist/foil-builder.js",
   "exports": "./dist/foil-builder.js",
   "scripts": {
-    "start": "tsc"
+    "start": "tsc && ts-node post-build.ts"
   },
   "bin": {
     "foil-builder": "dist/foil-builder.js"
@@ -35,7 +35,7 @@
   "devDependencies": {
     "@mdx-js/react": "^3.0.1",
     "@types/isomorphic-fetch": "^0.0.39",
-    "@types/node": "^22.5.2",
+    "@types/node": "^22.5.4",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@types/react-redux": "^7.1.33",

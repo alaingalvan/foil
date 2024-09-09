@@ -39,7 +39,7 @@ lazy_static! {
 #[async_std::main]
 async fn main() -> Result<()> {
     println!("✨ Foil CLI (v{})", env!("CARGO_PKG_VERSION"));
-    if cfg!(dev) {
+    if cfg!(feature = "buildinfo") {
         println!(
             "🌃 Build {} | {} | {}",
             env!("BUILD_GIT_BRANCH"),

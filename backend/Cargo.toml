@@ -46,3 +46,9 @@ tower-http = { version = "0.5.x", features = [
     "fs",
     "trace",
 ] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 16
+strip = true
