@@ -1,18 +1,18 @@
 [package]
 name = "foil_cli"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2021"
 
 [dependencies]
-async-std = { version = "1.12.x", features = ["attributes"] }
+async-std = { version = "1.13.x", features = ["attributes"] }
 chrono = { version = "0.4.x", features = ["serde"] }
 clap = "4.5.x"
 futures = "0.3.x"
 glob = "0.3.x"
-imagesize = "0.13.x"
+imagesize = "0.14.x"
 lexiclean = "0.0.1"
-lazy_static = "1.4.x"
+lazy_static = "1.5.x"
 path-slash = "0.2.x"
 rss = "2.0.x"
 serde = "1.0.x"

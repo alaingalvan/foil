@@ -1,6 +1,6 @@
 [package]
 name = "foil_backend"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2021"
 
@@ -11,19 +11,19 @@ async-graphql = { version = "7.0.x", features = [
     "chrono",
     "uuid",
 ] }
-async-trait = "0.1.x"
-axum = "0.7.x"
-axum-macros = "0.4.x"
+async-graphql-axum = "7.0.17"
+axum = "0.8.x"
+axum-macros = "0.5.x"
 chrono = { version = "0.4.x", features = ["serde"] }
 env_logger = "0.11.x"
 glob = "0.3.x"
 hyper-util = { version = "0.1.x", features = ["full"] }
-itertools = "0.13.x"
+itertools = "0.14.x"
 lexiclean = "0.0.1"
 log = "0.4.x"
 path-slash = "0.2.x"
+regex = "1.x.x"
 serde = "1.0.x"
-serde_json = "1.0.x"
 sqlx = { version = "0.8.x", features = [
     "chrono",
     "json",
@@ -33,15 +33,14 @@ sqlx = { version = "0.8.x", features = [
     "time",
     "uuid",
 ] }
-tokio = { version = "1.38.x", features = ["full"] }
-tokio-util = { version = "0.7.x", features = ["full"] }
-tower = { version = "0.4.x", features = [
+tokio = { version = "1.47.x", features = ["full"] }
+tower = { version = "0.5.x", features = [
     "limit",
     "load-shed",
     "timeout",
     "util",
 ] }
-tower-http = { version = "0.5.x", features = [
+tower-http = { version = "0.6.x", features = [
     "compression-gzip",
     "fs",
     "trace",

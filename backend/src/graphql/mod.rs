@@ -1,4 +1,3 @@
-mod async_graphql_axum;
 mod posts;
 
 use async_graphql::dataloader::DataLoader;

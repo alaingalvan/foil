@@ -3,9 +3,6 @@
 
 mod graphql;
 
-use glob::Pattern;
-use graphql::{graphql_handler, graphql_playground_handler, graphql_schema};
-
 use axum::{
     body::Body,
     error_handling::HandleErrorLayer,
@@ -17,7 +14,10 @@ use axum::{
     Router,
 };
 use axum::{extract::State, http::uri::Uri};
+use glob::Pattern;
+use graphql::{graphql_handler, graphql_playground_handler, graphql_schema};
 use hyper_util::{client::legacy::connect::HttpConnector, rt::TokioExecutor};
+use regex::Regex;
 use std::{net::SocketAddr, path::PathBuf};
 
 use sqlx::ConnectOptions;
@@ -73,19 +73,34 @@ async fn handler_renderer(
     State(state): State<RendererState>,
     mut req: Request<Body>,
 ) -> Result<Response, StatusCode> {
-    let path = req.uri().path().to_string();
+    // Fail Cases:
+    let res_not_found = Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body("".into())
+        .unwrap();
+    let res_bad = Response::builder()
+        .status(StatusCode::BAD_REQUEST)
+        .body("".into())
+        .unwrap();
+
+    // Early out any uri path that features non-alphanumeric symbols or symbols not allowed in file names.
+    let path = req.uri().path().trim_ascii().to_ascii_lowercase();
+    let re = Regex::new(r"[^A-Za-z0-9/\.\/\-\@]|(\/\.)|(\/\/+)|(\\+)").unwrap();
+    if re.is_match(&path) {
+        return Ok(res_bad);
+    }
+
     let path_pathbuf = PathBuf::from(path.clone());
     let ext_result = path_pathbuf.extension();
-    let mut last_response = Response::<Body>::new("".into());
-    *last_response.status_mut() = StatusCode::NOT_FOUND;
 
     // All paths that lack an extension are delegated to the node server-side renderer.
+
     if ext_result.is_none() {
         let path_query = req
             .uri()
             .path_and_query()
             .map(|v| v.as_str())
-            .unwrap_or(&path);
+            .unwrap_or("/404");
 
         let uri = format!("http://127.0.0.1:4011{}", path_query);
         *req.uri_mut() = Uri::try_from(uri).unwrap();
@@ -97,7 +112,9 @@ async fn handler_renderer(
                 .map_err(|_| StatusCode::BAD_REQUEST)?
                 .into_response();
             Ok::<_, StatusCode>(res)
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
     }
 
     // We try to resolve paths that have an extension using what's exposed from foil modules relative to the path.
@@ -129,7 +146,7 @@ async fn handler_renderer(
                             }
                         }
                         if !can_serve {
-                            return Ok(last_response);
+                            return Ok(res_not_found);
                         }
 
                         // 🫚 Split the permalink from the current request path:
@@ -147,7 +164,9 @@ async fn handler_renderer(
                                     let svc_resp = svc.oneshot(Request::new(Body::empty()));
                                     let res = svc_resp.await.into_response();
                                     Ok::<_, StatusCode>(res)
-                                }).await.unwrap();
+                                })
+                                .await
+                                .unwrap();
                             }
                             Err(_e) => (),
                         }
@@ -162,7 +181,7 @@ async fn handler_renderer(
     }
 
     // We couldn't find a file due to a server error, so we 404 and redirect to the 404 frontend page:
-    return Ok(last_response);
+    return Ok(res_not_found);
 }
 //=====================================================================================================================
 /// Error handling for the foil server.
@@ -201,11 +220,9 @@ async fn add_headers(req: Request<Body>, next: Next) -> Result<Response, Respons
         "strict-origin-when-cross-origin".parse().unwrap(),
     );
 
-
     let path_pathbuf = PathBuf::from(path.clone());
     let ext_result = path_pathbuf.extension();
-    if ext_result.is_some_and(|x| !(x == "js" || x == "css"))
-    {
+    if ext_result.is_some_and(|x| !(x == "js" || x == "css")) {
         headers.insert(
             "cache-control",
             "public, max-age=86400, stale-if-error=3600"
