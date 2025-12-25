@@ -333,7 +333,7 @@ pub fn read_foil_package(file_path: &PathBuf) -> Result<NodePackage> {
         Ok(v) => v,
         Err(_er) => {
             // TODO: We should probably leave this to some verbose mode...
-            println!("Failed to parse package.json, skipping. {:?}", _er);
+            println!("Failed to parse package.json, skipping. {}", _er.to_string());
             return Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "Failed to parse package.json, skipping.",

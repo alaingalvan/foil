@@ -10,7 +10,7 @@ System.addImportMap(importMap);
 
 const { routes, client } = await System.import(frontendMain);
 const { jsx } = await System.import("react/jsx-runtime");
-const { createStaticHandler, createStaticRouter, StaticRouterProvider } = await System.import("react-router-dom/server");
+const { createStaticHandler, createStaticRouter, StaticRouterProvider } = await System.import("react-router");
 const { renderToPipeableStream } = await System.import("react-dom/server");
 const { getDataFromTree } = await System.import("@apollo/client/react/ssr");
 
@@ -75,9 +75,9 @@ const foilRequestHandler = async (request, response) => {
   async function main() {
     const jsxRuntime = await System.import('react/jsx-runtime');
     const reactDom = await System.import('react-dom/client');
-    const reactRouterDom = await System.import('react-router-dom');
+    const reactRouter = await System.import('react-router');
     const app = await System.import('${frontendMain}');
-    const node = jsxRuntime.jsx(reactRouterDom.RouterProvider, { router: reactRouterDom.createBrowserRouter(app.routes) });
+    const node = jsxRuntime.jsx(reactRouter.RouterProvider, { router: reactRouter.createBrowserRouter(app.routes) });
     reactDom.hydrateRoot(document, node);
   }
   main();

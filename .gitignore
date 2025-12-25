@@ -3,8 +3,10 @@ node_modules
 modules/
 ts-node--*/
 *.js
+!ts-loader.js
 *.map
 rss.xml
+releases
 
 # Logs
 logs

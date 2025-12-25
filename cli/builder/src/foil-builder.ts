@@ -11,7 +11,7 @@ const { gray, green, cyan, red } = chalk;
 import webpack, { Configuration, Compiler } from "webpack";
 const { DefinePlugin } = webpack;
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
-import CssMinimizerPlugin  from 'css-minimizer-webpack-plugin';
+import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
 import rehypeKatex from "rehype-katex";
 import rehypeSlug from "rehype-slug";
 
@@ -63,7 +63,7 @@ for (let i = 0; i < argv.length; i++) {
   // Arg matches --args map:
   let found: string = Object.keys(args).reduce(
     (p, c) => ("--" + kebab(c) === arg ? c : p),
-    ""
+    "",
   );
   if (found.length > 0) {
     if (Array.isArray(args[found])) {
@@ -74,7 +74,7 @@ for (let i = 0; i < argv.length; i++) {
         if (i < argv.length) {
           let notFoundForward = !Object.keys(args).reduce(
             (p, c) => p || ("--" + kebab(c) === argv[i] ? true : false),
-            false
+            false,
           );
           if (notFoundForward) {
             args[found].push(argv[i]);
@@ -98,7 +98,7 @@ for (let i = 0; i < argv.length; i++) {
 // Fail if missing required arguments:
 if (args.rootPath.length <= 0) {
   console.error(
-    "foil-builder --root-path <path> --system --vendor --input <main> --output <dir>"
+    "foil-builder --root-path <path> --system --vendor --input <main> --output <dir>",
   );
   process.exit(1);
 }
@@ -128,7 +128,7 @@ function build(title, config: Configuration) {
       if (stats.hasErrors()) {
         let statsJson = stats.toJson();
         console.log(
-          "❌" + red(" · Error · ") + buildTitle + " failed to compile:"
+          "❌" + red(" · Error · ") + buildTitle + " failed to compile:",
         );
         for (let error of statsJson.errors) {
           console.warn(error.message);
@@ -140,7 +140,7 @@ function build(title, config: Configuration) {
           green("  · Success · ") +
           buildTitle +
           " built in " +
-          cyan(+stats.endTime - +stats.startTime + " ms.")
+          cyan(+stats.endTime - +stats.startTime + " ms."),
       );
       return res(stats);
     };
@@ -169,7 +169,7 @@ ${args.publicModules.reduce(
     '"' +
     (i < args.publicModules.length - 1 ? "," : "") +
     "\n",
-  ""
+  "",
 )}
   }
 }`;
@@ -186,7 +186,7 @@ ${args.publicModules.reduce(
       "✔️️" +
         green("  · Success · ") +
         " ⚙️ SystemJS input map built to:\n" +
-        importMap
+        importMap,
     );
   }
 
@@ -216,10 +216,10 @@ ${args.publicModules.reduce(
   // 📚 Build vendor libraries:
   if (args.publicModules.length > 0 && args.vendor) {
     for (let m of args.publicModules) {
-      let web = /\/((server)|(ssr))/.exec(m) === null;
+      let web = /((server)|(ssr))/.exec(m) === null;
       let externals = args.publicModules.reduce(
         (prev, cur) => (m != cur ? { ...prev, [cur]: cur } : prev),
-        {}
+        {},
       );
       await build(`📚 ${m} (${web ? "web" : "server"})`, {
         mode: nodeEnvStr,

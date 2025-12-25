@@ -44,9 +44,9 @@ function addDependencies(inputFile: string) {
             fileNameTest +
             "(\\/|\\\\)index\\.(j|t)sx?$)|(" +
             fileNameTest +
-            "\\.(j|t)sx?$)"
+            "\\.(j|t)sx?$)",
         ),
-        rootPath
+        rootPath,
       );
       for (let foundMDXImport of foundMDXImports) {
         if (foundMDXImport != inputFile) {

@@ -8,13 +8,14 @@ mod query_post;
 mod reset;
 mod server;
 
-use builder::{build, BuildMode};
+use builder::{BuildMode, build};
 use chrono::Utc;
-use clap::{arg, ArgMatches, Command};
+
+use clap::{ArgMatches, Command, arg};
 use lazy_static::lazy_static;
 use reset::reset;
 use server::start_server;
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -34,21 +35,21 @@ fn get_build_mode(default: BuildMode, sub_m: &ArgMatches) -> BuildMode {
 
 lazy_static! {
     static ref BUILD_DATE: String = Utc::now().format("%m/%d/%Y").to_string();
+    static ref APP_VERSION: String = format!("v{}", env!("CARGO_PKG_VERSION"));
+    static ref APP_VERSION_LONG: String = format!(
+        "{}\n🌃 Build {} | {} | {}",
+        APP_VERSION.as_str(),
+        env!("BUILD_GIT_BRANCH"),
+        env!("BUILD_GIT_COMMIT"),
+        BUILD_DATE.as_str()
+    );
 }
 
 #[async_std::main]
 async fn main() -> Result<()> {
-    println!("✨ Foil CLI (v{})", env!("CARGO_PKG_VERSION"));
-    if cfg!(feature = "buildinfo") {
-        println!(
-            "🌃 Build {} | {} | {}",
-            env!("BUILD_GIT_BRANCH"),
-            env!("BUILD_GIT_COMMIT"),
-            env!("BUILD_TIME")
-        );
-    }
     let mut app = Command::new("✨ foil")
-        .version("0.1.0")
+        .version(APP_VERSION.as_str())
+        .long_version(APP_VERSION_LONG.as_str())
         .about("💫 Foil's primary CLI application, provides everything needed to start and manage a foil project.")
         .subcommand(
             Command::new("build")

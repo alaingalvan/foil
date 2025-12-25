@@ -1,8 +1,8 @@
 [package]
 name = "foil_backend"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Alain Galvan <hi@alain.xyz>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 async-graphql = { version = "7.0.x", features = [
@@ -33,7 +33,7 @@ sqlx = { version = "0.8.x", features = [
     "time",
     "uuid",
 ] }
-tokio = { version = "1.47.x", features = ["full"] }
+tokio = { version = "1.48.x", features = ["full"] }
 tower = { version = "0.5.x", features = [
     "limit",
     "load-shed",

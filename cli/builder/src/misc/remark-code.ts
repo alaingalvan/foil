@@ -93,11 +93,14 @@ function addLineNumbersBlockFor(inputHtml, options) {
           CODE_BLOCK_NAME,
           i + options.startFrom,
           line,
-        ]
+        ],
       );
     }
 
-    return format('<table className="{0}"><tbody>{1}</tbody></table>', [TABLE_NAME, html]);
+    return format('<table className="{0}"><tbody>{1}</tbody></table>', [
+      TABLE_NAME,
+      html,
+    ]);
   }
 
   return inputHtml;
@@ -149,7 +152,7 @@ const transformer: Transformer<Root> = (ast) => {
         value,
         data: { estree },
       } as MdxFlowExpression;
-    }
+    },
   );
 };
 

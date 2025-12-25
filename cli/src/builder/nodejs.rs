@@ -36,7 +36,7 @@ pub fn find_all_imports(main: String, root_path: &PathBuf) -> Vec<FoilFile> {
         .replace("\\", "/");
     let find = Command::new("node")
         .current_dir(&foil_builder_path)
-        .args(["dist/resolve-imports.js", &root_path_string, &main_abs_str])
+        .args(["dist/src/resolve-imports.js", &root_path_string, &main_abs_str])
         .output()
         .unwrap();
     let out_string = String::from_utf8(find.stdout).unwrap_or("[]".to_string());
@@ -155,7 +155,7 @@ pub fn compile_foil_main(
         "--experimental-modules",
         "--experimental-import-meta-resolve",
         "--no-warnings",
-        "dist/foil-builder.js",
+        "dist/src/foil-builder.js",
         "--name",
         &resolved_foil.name,
         "--main-title",

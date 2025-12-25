@@ -1,8 +1,8 @@
 [package]
 name = "foil_cli"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["Alain Galvan <hi@alain.xyz>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 async-std = { version = "1.13.x", features = ["attributes"] }
@@ -38,6 +38,3 @@ opt-level = 3
 lto = true
 codegen-units = 16
 strip = true
-
-[features]
-buildinfo = []
