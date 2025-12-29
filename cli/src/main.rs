@@ -19,18 +19,18 @@ use std::io::{Write, stdout};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-fn get_build_mode(default: BuildMode, sub_m: &ArgMatches) -> BuildMode {
-    if let Some(v) = sub_m.get_one::<bool>("release") {
-        if *v {
-            return BuildMode::Release;
-        }
+fn get_build_mode(sub_match: &ArgMatches) -> BuildMode {
+    if let Some(v) = sub_match.get_one::<bool>("release")
+        && *v
+    {
+        BuildMode::Release
+    } else if let Some(v) = sub_match.get_one::<bool>("dev")
+        && *v
+    {
+        BuildMode::Development
+    } else {
+        BuildMode::Release
     }
-    if let Some(v) = sub_m.get_one::<bool>("dev") {
-        if *v {
-            return BuildMode::Development;
-        }
-    }
-    default
 }
 
 lazy_static! {
@@ -55,8 +55,8 @@ async fn main() -> Result<()> {
             Command::new("build")
                 .display_order(3)
                 .about("🛠️ Build your foil project, both the frontend/portfolio.")
-                .args(&[arg!(--release "🧑‍💼 Build your frontend and backend in Release mode (default)."),
-                        arg!(--dev "🧑‍💻 Build your frontend and backend in Development mode."),
+                .args(&[arg!(--release "💼 Build your frontend and backend in Release mode (default)."),
+                        arg!(--dev "🪲 Build your frontend and backend in Development mode."),
                         arg!(--watch "👁️ Build your foil project and automatically compile any changes to it.")])
         )
         .subcommand(
@@ -66,8 +66,8 @@ async fn main() -> Result<()> {
                 .subcommand(
                     Command::new("start")
                         .about("Start the foil server.")
-                        .arg(arg!(--release "🧑‍💼 Runs server in Release mode. (default)"))
-                        .arg(arg!(--dev "🧑‍💻 Runs server in Development mode.")))
+                        .arg(arg!(--release "💼 Runs server in Release mode. (default)"))
+                        .arg(arg!(--dev "🪲 Runs server in Development mode.")))
                 .subcommand(
                     Command::new("reset")
                     .about("Reset the server database."))
@@ -81,19 +81,21 @@ async fn main() -> Result<()> {
 
     let matches = app.get_matches();
     match matches.subcommand() {
-        Some(("build", sub_m)) => {
-            let build_mode = get_build_mode(BuildMode::Release, sub_m);
-            let _ = build(build_mode.clone()).await;
+        Some(("build", sub_match)) => {
+            let build_mode = get_build_mode(sub_match);
+            build(build_mode.clone()).await?;
         }
-        Some(("server", sub_m)) => {
-            match sub_m.subcommand() {
-                Some(("start", sub_m)) => {
-                    let build_mode = get_build_mode(BuildMode::Release, sub_m);
-                    let _ = start_server(build_mode.clone()).await;
+        Some(("server", sub_match)) => {
+            match sub_match.subcommand() {
+                Some(("start", sub_match)) => {
+                    let build_mode = get_build_mode(sub_match);
+                    if sub_match.get_one::<bool>("watch").copied().unwrap_or(false) {
+                        out.write(b"Watch mode is currently not implemented.")?;
+                    } else {
+                        start_server(build_mode).await?;
+                    }
                 }
-                Some(("reset", _sub_m)) => {
-                    let _ = reset().await;
-                }
+                Some(("reset", _sub_m)) => reset().await?,
                 _ => (),
             };
         }

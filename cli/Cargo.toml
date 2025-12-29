@@ -1,6 +1,6 @@
 [package]
 name = "foil_cli"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2024"
 

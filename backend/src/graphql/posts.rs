@@ -96,7 +96,6 @@ impl FoilLoader {
     }
 }
 
-
 impl Loader<PostId> for FoilLoader {
     type Value = Post;
     type Error = FieldError;
@@ -228,14 +227,8 @@ impl QueryPosts {
         }
         permalink_regex += "$";
 
-        let mut offset = offset.unwrap_or(0);
-        if offset > 10000 {
-            offset = 10000;
-        }
-        let mut limit = limit.unwrap_or(10);
-        if limit > 100 {
-            limit = 100;
-        }
+        let offset = offset.unwrap_or(0).min(10000);
+        let limit = limit.unwrap_or(10).min(100);
 
         let sql_result: Vec<Post> = sqlx::query_as(&cur_query)
             .bind(&permalink_regex)
@@ -266,50 +259,55 @@ impl QueryPosts {
     /// 🪺 Find the post closest to a given permalink by recursively querying down.
     async fn post_recursive(&self, ctx: &Context<'_>, permalink: String) -> Result<Option<Post>> {
         if permalink.len() > 254 {
-            let err_str = format!(
+            return err(&format!(
                 "Permalinks must have less than 254 characters. Check {}.",
                 &permalink
-            );
-            return err(&err_str);
+            ));
         }
+
         let postgres_pool: &Pool<Postgres> = ctx.data_opt().unwrap();
         let path_pathbuf = PathBuf::from(permalink);
-        let mut path_ancestors = path_pathbuf.ancestors();
-        loop {
-            let ancestor = path_ancestors.next();
-            match ancestor {
-                Some(par) => {
-                    let par_path_buf = par.to_path_buf();
-                    let par_clean = clean_path_string(&par_path_buf);
-                    let cur_query = include_str!("sql/post_recursive_public.sql");
-                    let sql_result: Result<SQLPost, sqlx::Error> = sqlx::query_as(&cur_query)
-                        .bind(&par_clean)
-                        .fetch_one(postgres_pool)
-                        .await;
-                    match sql_result {
-                        Ok(sql_post) => {
-                            return Ok(Some(Post {
-                                id: sql_post.id,
-                                permalink: sql_post.permalink,
-                                title: sql_post.title,
-                                authors: sql_post.authors.0,
-                                description: sql_post.description,
-                                keywords: sql_post.keywords,
-                                covers: sql_post.covers,
-                                main: sql_post.main,
-                                date_published: sql_post.date_published,
-                                date_modified: sql_post.date_modified,
-                            }));
-                        }
-                        Err(_sql_e) => (),
-                    }
+
+        // Try to find the post by traversing up the path hierarchy
+        let mut current_path = path_pathbuf.clone();
+
+        while current_path != PathBuf::from("/") {
+            let clean_path = clean_path_string(&current_path);
+
+            // Query for the post at this level
+            let cur_query = include_str!("sql/post_recursive_public.sql");
+            let sql_result: Result<SQLPost, sqlx::Error> = sqlx::query_as(&cur_query)
+                .bind(&clean_path)
+                .fetch_one(postgres_pool)
+                .await;
+
+            match sql_result {
+                Ok(sql_post) => {
+                    return Ok(Some(Post {
+                        id: sql_post.id,
+                        permalink: sql_post.permalink,
+                        title: sql_post.title,
+                        authors: sql_post.authors.0,
+                        description: sql_post.description,
+                        keywords: sql_post.keywords,
+                        covers: sql_post.covers,
+                        main: sql_post.main,
+                        date_published: sql_post.date_published,
+                        date_modified: sql_post.date_modified,
+                    }));
                 }
-                None => {
-                    break;
+                Err(_) => {
+                    // If no post found at this level, move up the hierarchy
+                    if let Some(parent) = current_path.parent() {
+                        current_path = parent.to_path_buf();
+                    } else {
+                        break;
+                    }
                 }
             }
         }
-        return Ok(None);
+
+        Ok(None)
     }
 
     /// 🔎🍎 Search posts based on a given search string.

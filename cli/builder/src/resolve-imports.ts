@@ -12,42 +12,44 @@ if (argv.length < 2) {
   console.error("Missing arguments: resolve-imports <root> <file>");
   process.exit(1);
 }
-let rootPath = argv[argv.length - 2];
-let main = argv[argv.length - 1];
+const rootPath = argv[argv.length - 2];
+const main = argv[argv.length - 1];
 
 // 🔎 Resolve JavaScript dependencies of main file:
 // This only applies to packages outside `node_modules`,
 // While it can resolve `import` statements, CommonJS works best.
 let resolvedImportSet = new Set<string>();
 
-//=====================================================================================================================
+//=============================================================================
 function addDependencies(inputFile: string) {
   // Resolve all MDX imports from a given source file:
   if (/\.mdx$/.test(inputFile)) {
     // Read the file and resolve all 'import' statements manually.
-    // Doesn't cover dynamic import(...) statements is inside a code block.
+    // Doesn't cover dynamic import(...) statements inside a code block.
     let mdxPost = readFileSync(inputFile).toString();
     let importFile = /(import\s*.*)(("|')(.*)("|'))/g;
     let matches = mdxPost.match(importFile) || [];
-    for (let m of matches) {
+
+    for (let match of matches) {
       // Get the './my/path' portion of the import statement.
-      let groups = /('|")(.*)('|")/.exec(m);
+      let groups = /('|")(.*)('|")/.exec(match);
+      if (!groups) continue;
+
       let mdxImportFile = groups[2];
 
       // Build an absolute path from it relative to the current file.
       let filePath = dirname(inputFile);
-      let fileNameTest = join(filePath, mdxImportFile);
-      fileNameTest = relative(rootPath, fileNameTest);
-      let foundMDXImports = fileSync(
-        new RegExp(
-          "(" +
-            fileNameTest +
-            "(\\/|\\\\)index\\.(j|t)sx?$)|(" +
-            fileNameTest +
-            "\\.(j|t)sx?$)",
-        ),
-        rootPath,
+      let fileNameTest = relative(rootPath, join(filePath, mdxImportFile));
+
+      let fileRegex = new RegExp(
+        "(" +
+          fileNameTest +
+          "(\\/|\\\\)index\\.(j|t)sx?$)|(" +
+          fileNameTest +
+          "\\.(j|t)sx?$)"
       );
+
+      let foundMDXImports = fileSync(fileRegex, rootPath);
       for (let foundMDXImport of foundMDXImports) {
         if (foundMDXImport != inputFile) {
           addDependencies(foundMDXImport);
@@ -89,6 +91,7 @@ function addDependencies(inputFile: string) {
   }
 }
 
+//=============================================================================
 if (main.match(/\.((t|j)s)|(mdx)$/)) {
   let filename = main;
   if (!isAbsolute(filename)) {

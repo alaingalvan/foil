@@ -71,11 +71,13 @@ function addLineNumbersBlockFor(inputHtml, options) {
     for (var i = 0, l = lines.length; i < l; i++) {
       // Close any HTML tags that haven't been closed.
       let line = lines[i].length > 0 ? lines[i] : " ";
+
       line = sanitizeHtml(line, {
         allowedClasses: {
           "*": ["hljs*"],
         },
       });
+
       html += format(
         "<tr>" +
           '<td className="{0} {1}" {3}="{5}">' +
@@ -117,8 +119,6 @@ const transformer: Transformer<Root> = (ast) => {
 
       // 🔣 Escape code like newlines.
       let code = node.value;
-      //code = code.replaceAll("<", "&lt;");
-      //code = code.replaceAll(">", "&gt;");
 
       // 🖋️ Process code with highlight.js
       if (node.lang && getLanguage(node.lang)) {
@@ -137,13 +137,16 @@ const transformer: Transformer<Root> = (ast) => {
       if (node.meta) {
         code = addLineNumbersBlockFor(code, { startFrom: 1 });
       }
-      code = code.replaceAll("{", "&#123;");
-      code = code.replaceAll("}", "&#125;");
-      code = code.replaceAll("\n", "{'\\n'}");
-      code = code.replaceAll("class=", "className=");
+
+      code = code
+        .replaceAll("{", "&#123;")
+        .replaceAll("}", "&#125;")
+        .replaceAll("\n", "{'\\n'}")
+        .replaceAll("class=", "className=");
 
       const codeProps = `className="language-${node.lang}"`;
       const value = `<div><pre ${node.meta}><code ${codeProps}>${code}</code></pre></div>`;
+
       const estree = parser.parse(value, {
         ecmaVersion: "latest",
       }) as BaseNode as Program;

@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS posts (
     main varchar(254) NOT NULL,
     date_published TIMESTAMPTZ NOT NULL,
     date_modified TIMESTAMPTZ NOT NULL,
-
     output_path varchar(254) NOT NULL,
     root_path varchar(254) NOT NULL UNIQUE,
     public_modules varchar(254)[] NOT NULL,

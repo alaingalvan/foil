@@ -4,6 +4,7 @@
 mod graphql;
 
 use axum::{
+    Router,
     body::Body,
     error_handling::HandleErrorLayer,
     extract::Extension,
@@ -11,7 +12,6 @@ use axum::{
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
-    Router,
 };
 use axum::{extract::State, http::uri::Uri};
 use glob::Pattern;
@@ -21,7 +21,7 @@ use regex::Regex;
 use std::{net::SocketAddr, path::PathBuf};
 
 use sqlx::ConnectOptions;
-use sqlx::{postgres::PgConnectOptions, Pool, Postgres};
+use sqlx::{Pool, Postgres, postgres::PgConnectOptions};
 use std::time::Duration;
 use tower::{BoxError, ServiceBuilder, ServiceExt};
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
@@ -279,8 +279,21 @@ async fn main() {
         .with_state(renderer_state);
 
     // ✨ Bind Foil Backend:
-    println!("✨ Foil Backend Server running in http://localhost:4017");
-    let addr = SocketAddr::from(([127, 0, 0, 1], 4017));
+    let hostname_str = std::env::var("FOIL_HOSTNAME").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let port: u16 = std::env::var("FOIL_PORT")
+        .ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(4017);
+    let hostname_parts: Vec<&str> = hostname_str.split('.').collect();
+    let mut hostname = [0u8; 4];
+    for (i, part) in hostname_parts.iter().take(4).enumerate() {
+        hostname[i] = part.parse::<u8>().unwrap_or(0);
+    }
+    println!(
+        "✨ Foil Backend Server running in http://{}:{}",
+        hostname_str, port
+    );
+    let addr = SocketAddr::from((hostname, port));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app.layer(TraceLayer::new_for_http()))
         .await

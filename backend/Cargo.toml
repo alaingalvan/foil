@@ -1,17 +1,17 @@
 [package]
 name = "foil_backend"
-version = "0.5.3"
+version = "0.5.4"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2024"
 
 [dependencies]
-async-graphql = { version = "7.0.x", features = [
+async-graphql = { version = "7.2.x", features = [
     "dataloader",
     "decimal",
     "chrono",
     "uuid",
 ] }
-async-graphql-axum = "7.0.17"
+async-graphql-axum = "7.2.x"
 axum = "0.8.x"
 axum-macros = "0.5.x"
 chrono = { version = "0.4.x", features = ["serde"] }
@@ -33,7 +33,7 @@ sqlx = { version = "0.8.x", features = [
     "time",
     "uuid",
 ] }
-tokio = { version = "1.48.x", features = ["full"] }
+tokio = { version = "1.49.x", features = ["full"] }
 tower = { version = "0.5.x", features = [
     "limit",
     "load-shed",
