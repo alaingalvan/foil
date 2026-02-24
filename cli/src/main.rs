@@ -8,7 +8,7 @@ mod query_post;
 mod reset;
 mod server;
 
-use builder::{BuildMode, build};
+use builder::{BuildMode, build, watch};
 use chrono::Utc;
 
 use clap::{ArgMatches, Command, arg};
@@ -83,17 +83,17 @@ async fn main() -> Result<()> {
     match matches.subcommand() {
         Some(("build", sub_match)) => {
             let build_mode = get_build_mode(sub_match);
-            build(build_mode.clone()).await?;
+            if sub_match.get_one::<bool>("watch").copied().unwrap_or(false) {
+                watch(build_mode.clone()).await?;
+            } else {
+                build(build_mode.clone()).await?;
+            }
         }
         Some(("server", sub_match)) => {
             match sub_match.subcommand() {
                 Some(("start", sub_match)) => {
                     let build_mode = get_build_mode(sub_match);
-                    if sub_match.get_one::<bool>("watch").copied().unwrap_or(false) {
-                        out.write(b"Watch mode is currently not implemented.")?;
-                    } else {
-                        start_server(build_mode).await?;
-                    }
+                    start_server(build_mode).await?;
                 }
                 Some(("reset", _sub_m)) => reset().await?,
                 _ => (),

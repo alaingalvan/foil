@@ -1,21 +1,24 @@
 pub mod build_mode;
+pub mod package_schema;
 
 mod database;
 mod metadata;
 mod nodejs;
-pub mod package_schema;
 mod resolver;
 mod rss;
 mod static_assets;
+mod watcher;
 
 use crate::error::Result;
 use crate::misc::connect_db;
 pub use build_mode::BuildMode;
-use database::{clean_database, udpate_foil_db};
-use metadata::{write_foil_metadata, FoilMetadata};
-use nodejs::compile_foil_main;
 pub use resolver::read_foil_package;
-use resolver::{resolve_foils, Foil};
+pub use watcher::watch;
+
+use database::{clean_database, udpate_foil_db};
+use metadata::{FoilMetadata, write_foil_metadata};
+use nodejs::compile_foil_main;
+use resolver::{Foil, resolve_foils};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;

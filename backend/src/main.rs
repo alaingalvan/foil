@@ -85,7 +85,7 @@ async fn handler_renderer(
 
     // Early out any uri path that features non-alphanumeric symbols or symbols not allowed in file names.
     let path = req.uri().path().trim_ascii().to_ascii_lowercase();
-    let re = Regex::new(r"[^A-Za-z0-9/\.\/\-\@]|(\/\.)|(\/\/+)|(\\+)").unwrap();
+    let re = Regex::new(r"[^A-Za-z0-9/._\-@]|(\/\.)|(\/\/+)|(\\+)").unwrap();
     if re.is_match(&path) {
         return Ok(res_bad);
     }
