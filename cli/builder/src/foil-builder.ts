@@ -108,10 +108,40 @@ const nodeEnvStr: any = args.production ? "production" : "development";
 const buildDir = args.output;
 const buildDirAbs = join(args.rootPath, buildDir);
 // TODO: Load join(args.rootPath, "tsconfig.json"), then root foil's tsconfig, then builder's tsconfig.
-const tsConfigFile = join(process.cwd(), "tsconfig.json");
+let tsConfigFile: string = "";
 const mainTitle =
   args.mainTitle.length < 1 ? parse(args.input).name : args.mainTitle;
 const libraryName = args.name.length < 1 ? kebab(mainTitle) : args.name;
+
+// ⚙️ Find the best tsconfig file
+const possibleTsConfigs = [
+  join(args.rootPath, "tsconfig.json"),
+  join(process.cwd(), "tsconfig.json"),
+];
+
+async function findTsConfig() {
+  for (const configPath of possibleTsConfigs) {
+    try {
+      await stat(configPath);
+      return configPath;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  return "";
+}
+
+tsConfigFile = await findTsConfig();
+
+if (!tsConfigFile) {
+  console.error(
+    chalk.red(
+      `❌ Error: Could not find a tsconfig.json in ${args.rootPath} or the current working directory.`,
+    ),
+  );
+  process.exit(1);
+}
 
 //=====================================================================================================================
 // 🔧 Build or watch Webpack compilation with some helpful metadata shared.
@@ -189,6 +219,18 @@ ${args.publicModules.reduce(
         importMap,
     );
   }
+
+  const tsLoaderOptions = {
+    transpileOnly: true,
+    configFile: tsConfigFile,
+    onlyCompileBundledFiles: true,
+    compilerOptions: {
+      sourceMap: !args.production,
+      rootDir: args.rootPath,
+      module: "ESNext",
+      moduleResolution: "Bundler",
+    },
+  };
 
   // 🌄 Build SystemJS runtime:
   if (args.system) {
@@ -346,14 +388,7 @@ ${args.publicModules.reduce(
           {
             test: /\.tsx?$/,
             loader: "ts-loader",
-            options: {
-              transpileOnly: true,
-              configFile: tsConfigFile,
-              compilerOptions: {
-                module: "esnext",
-                sourceMap: args.production ? false : true,
-              },
-            },
+            options: tsLoaderOptions,
           },
           {
             test: /\.s?css$/,
@@ -403,16 +438,7 @@ ${args.publicModules.reduce(
             use: [
               {
                 loader: "ts-loader",
-                options: {
-                  transpileOnly: true,
-                  // At the moment, we only use the `tsconfig.json` in the builder.
-                  // Users may want to use the one in their project build directory, so we should prioritize that.
-                  configFile: join(process.cwd(), "tsconfig.json"),
-                  compilerOptions: {
-                    module: "esnext",
-                    sourceMap: args.production ? false : true,
-                  },
-                },
+                options: tsLoaderOptions,
               },
               {
                 loader: "@mdx-js/loader",

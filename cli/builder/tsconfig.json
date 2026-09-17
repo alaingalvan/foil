@@ -11,8 +11,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "lib": ["dom", "es2021"],
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "noEmitHelpers": false,
     "noImplicitAny": false,
     "outDir": "dist",
@@ -23,12 +23,5 @@
     "target": "es2021"
   },
   "exclude": ["node_modules"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "post-build.ts"],
-  "ts-node": {
-    "esm": true,
-    "experimentalResolver": true,
-    "experimentalSpecifierResolution": "node",
-    "files": true,
-    "transpileOnly": true
-  }
+  "include": ["./**/*.ts", "./**/*.tsx"]
 }

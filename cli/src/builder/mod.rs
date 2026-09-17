@@ -15,7 +15,7 @@ pub use build_mode::BuildMode;
 pub use resolver::read_foil_package;
 pub use watcher::watch;
 
-use database::{clean_database, udpate_foil_db};
+use database::{clean_database, update_foil_db};
 use metadata::{FoilMetadata, write_foil_metadata};
 use nodejs::compile_foil_main;
 use resolver::{Foil, resolve_foils};
@@ -67,7 +67,7 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
                 &resolved_foil_len
             );
             // 📅 Write foil post to database.
-            let update_future = udpate_foil_db(resolved_foil.clone(), pool.clone());
+            let update_future = update_foil_db(resolved_foil.clone(), pool.clone());
 
             // ⏳ Only wait for frontend posts.
             if resolved_foil.frontend {

@@ -1,6 +1,6 @@
 [package]
 name = "foil_backend"
-version = "0.5.4"
+version = "0.5.5"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2024"
 
@@ -18,29 +18,28 @@ chrono = { version = "0.4.x", features = ["serde"] }
 env_logger = "0.11.x"
 glob = "0.3.x"
 hyper-util = { version = "0.1.x", features = ["full"] }
-itertools = "0.14.x"
-lexiclean = "0.0.1"
+lexiclean = "0.0.2"
 log = "0.4.x"
 path-slash = "0.2.x"
 regex = "1.x.x"
 serde = "1.0.x"
-sqlx = { version = "0.8.x", features = [
+sqlx = { version = "0.9.x", features = [
     "chrono",
     "json",
     "postgres",
     "regexp",
-    "runtime-tokio-rustls",
+    "runtime-tokio",
     "time",
     "uuid",
 ] }
-tokio = { version = "1.49.x", features = ["full"] }
+tokio = { version = "1.53.x", features = ["full"] }
 tower = { version = "0.5.x", features = [
     "limit",
     "load-shed",
     "timeout",
     "util",
 ] }
-tower-http = { version = "0.6.x", features = [
+tower-http = { version = "0.7.x", features = [
     "compression-gzip",
     "fs",
     "trace",

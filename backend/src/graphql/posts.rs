@@ -3,7 +3,6 @@ use async_graphql::dataloader::Loader;
 use async_graphql::futures_util::TryStreamExt;
 use async_graphql::{Context, FieldError, Object, Result, SimpleObject};
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 use log::error;
 use serde::Serialize;
 use sqlx::{Pool, Postgres};
@@ -101,8 +100,9 @@ impl Loader<PostId> for FoilLoader {
     type Error = FieldError;
 
     async fn load(&self, keys: &[PostId]) -> Result<HashMap<PostId, Self::Value>, Self::Error> {
-        let sql_query = format!(include_str!("sql/post_load.sql"), keys.iter().join(","));
-        let sql_postmap: HashMap<PostId, SQLPost> = sqlx::query_as(&sql_query)
+        let ids: Vec<i32> = keys.iter().map(|key| key.0).collect();
+        let sql_postmap: HashMap<PostId, SQLPost> = sqlx::query_as(include_str!("sql/post_load.sql"))
+            .bind(&ids)
             .fetch(&self.pool)
             .map_err(|x| {
                 error!("Query Failed: {}", x.to_string());
@@ -166,7 +166,7 @@ impl QueryPosts {
         }
         let postgres_pool: &Pool<Postgres> = ctx.data_opt().unwrap();
         let cur_query = include_str!("sql/posts_from_permalinks.sql");
-        let sql_result: Vec<Post> = sqlx::query_as(&cur_query)
+        let sql_result: Vec<Post> = sqlx::query_as(cur_query)
             .bind(&permalinks)
             .fetch(postgres_pool)
             .map_err(|x| {
@@ -230,7 +230,7 @@ impl QueryPosts {
         let offset = offset.unwrap_or(0).min(10000);
         let limit = limit.unwrap_or(10).min(100);
 
-        let sql_result: Vec<Post> = sqlx::query_as(&cur_query)
+        let sql_result: Vec<Post> = sqlx::query_as(cur_query)
             .bind(&permalink_regex)
             .bind(&limit)
             .bind(&offset)
@@ -276,7 +276,7 @@ impl QueryPosts {
 
             // Query for the post at this level
             let cur_query = include_str!("sql/post_recursive_public.sql");
-            let sql_result: Result<SQLPost, sqlx::Error> = sqlx::query_as(&cur_query)
+            let sql_result: Result<SQLPost, sqlx::Error> = sqlx::query_as(cur_query)
                 .bind(&clean_path)
                 .fetch_one(postgres_pool)
                 .await;
@@ -323,7 +323,7 @@ impl QueryPosts {
         let cur_query = include_str!("sql/post_search.sql");
         let sanitized_string = search_string.replace("%", "").replace("_", "");
         let str = "%".to_string() + &sanitized_string + "%";
-        let sql_result: Vec<Post> = sqlx::query_as(&cur_query)
+        let sql_result: Vec<Post> = sqlx::query_as(cur_query)
             .bind(&str)
             .fetch(postgres_pool)
             .map_err(|x| {

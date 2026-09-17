@@ -55,13 +55,13 @@ struct RendererState {
 /// Query a given permalink's recursive post.
 async fn query_post_recursive(
     pool: &Pool<Postgres>,
-    permalink: &String,
+    permalinks: &[String],
 ) -> Result<(String, String, Vec<String>, String), sqlx::Error> {
     let cur_query = include_str!("graphql/sql/post_recursive.sql");
     // (Root Path, Permalink, Assets, Main)
     let sql_result: Result<(String, String, Vec<String>, String), sqlx::Error> =
-        sqlx::query_as(&cur_query)
-            .bind(permalink)
+        sqlx::query_as(cur_query)
+            .bind(permalinks)
             .fetch_one(pool)
             .await;
     return sql_result;
@@ -117,67 +117,58 @@ async fn handler_renderer(
         .unwrap();
     }
 
-    // We try to resolve paths that have an extension using what's exposed from foil modules relative to the path.
-    // We cache queried results to speed this up.
-    let mut path_ancestors = path_pathbuf.ancestors();
-    path_ancestors.next();
-    loop {
-        let ancestor = path_ancestors.next();
-        match ancestor {
-            Some(par) => {
-                let par_path_buf = par.to_path_buf();
-                let par_clean = clean_path_string(&par_path_buf);
-                match query_post_recursive(&state.pool, &par_clean).await {
-                    Ok(v) => {
-                        // 🤍 Early out based on allowed paths and extensions.
-                        // We first check if the foil main is the path, then check our whitelist.
-                        let mut can_serve = v.3 == path;
-                        if !can_serve {
-                            for asset in v.2 {
-                                let full_asset_path_buf = PathBuf::from(&v.1).join(&asset);
-                                let full_asset_path = clean_path_string(&full_asset_path_buf);
-                                match Pattern::new(&full_asset_path) {
-                                    Ok(pat) => {
-                                        can_serve |= pat.matches(&path);
-                                        break;
-                                    }
-                                    Err(_) => (),
-                                }
-                            }
-                        }
-                        if !can_serve {
-                            return Ok(res_not_found);
-                        }
+    // Resolve paths with an extension using assets exposed by foil modules.
+    let permalinks: Vec<String> = path_pathbuf
+        .ancestors()
+        .skip(1)
+        .map(|ancestor| clean_path_string(&ancestor.to_path_buf()))
+        .collect();
 
-                        // 🫚 Split the permalink from the current request path:
-                        // Example: /blog/ray-tracing-denoising/assets/cover.jpg becomes:
-                        // Result: asset/cover.jpg
-                        let mut cur_path_string = path.to_string().replacen(&v.1, "", 1);
-                        if cur_path_string.starts_with("/") {
-                            cur_path_string = cur_path_string.replacen("/", "", 1);
+    match query_post_recursive(&state.pool, &permalinks).await {
+        Ok(v) => {
+            // 🤍 Early out based on allowed paths and extensions.
+            // We first check if the foil main is the path, then check our whitelist.
+            let mut can_serve = v.3 == path;
+            if !can_serve {
+                for asset in v.2 {
+                    let full_asset_path_buf = PathBuf::from(&v.1).join(&asset);
+                    let full_asset_path = clean_path_string(&full_asset_path_buf);
+                    match Pattern::new(&full_asset_path) {
+                        Ok(pat) => {
+                            can_serve |= pat.matches(&path);
+                            break;
                         }
-                        match PathBuf::from_str(&v.0) {
-                            Ok(post_root) => {
-                                let possible_file_path = post_root.join(&cur_path_string);
-                                let svc = tower_http::services::ServeFile::new(possible_file_path);
-                                return tokio::spawn(async move {
-                                    let svc_resp = svc.oneshot(Request::new(Body::empty()));
-                                    let res = svc_resp.await.into_response();
-                                    Ok::<_, StatusCode>(res)
-                                })
-                                .await
-                                .unwrap();
-                            }
-                            Err(_e) => (),
-                        }
+                        Err(_) => (),
                     }
-                    Err(_sql_e) => (),
                 }
             }
-            None => {
-                break;
+            if !can_serve {
+                return Ok(res_not_found);
+            }
+
+            // 🫚 Split the permalink from the current request path:
+            // Example: /blog/ray-tracing-denoising/assets/cover.jpg becomes:
+            // Result: asset/cover.jpg
+            let mut cur_path_string = path.to_string().replacen(&v.1, "", 1);
+            if cur_path_string.starts_with("/") {
+                cur_path_string = cur_path_string.replacen("/", "", 1);
+            }
+            match PathBuf::from_str(&v.0) {
+                Ok(post_root) => {
+                    let possible_file_path = post_root.join(&cur_path_string);
+                    let svc = tower_http::services::ServeFile::new(possible_file_path);
+                    return tokio::spawn(async move {
+                        let svc_resp = svc.oneshot(Request::new(Body::empty()));
+                        let res = svc_resp.await.into_response();
+                        Ok::<_, StatusCode>(res)
+                    })
+                    .await
+                    .unwrap();
+                }
+                Err(_e) => (),
             }
         }
+        Err(_sql_e) => (),
     }
 
     // We couldn't find a file due to a server error, so we 404 and redirect to the 404 frontend page:

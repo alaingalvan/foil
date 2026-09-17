@@ -15,7 +15,7 @@ use std::str::FromStr;
 
 //=====================================================================================================================
 /// Update the database with a given foil post.
-pub async fn udpate_foil_db(foil: Foil, pool: Pool<Postgres>) -> JoinHandle<Result<()>> {
+pub async fn update_foil_db(foil: Foil, pool: Pool<Postgres>) -> JoinHandle<Result<()>> {
     spawn(async move {
         let root_path_str = foil
             .root_path
@@ -54,20 +54,20 @@ pub async fn udpate_foil_db(foil: Foil, pool: Pool<Postgres>) -> JoinHandle<Resu
         let query = if !updating {
             format!(
                 r#"
-        INSERT INTO posts 
+        INSERT INTO posts
         (name, permalink, title, authors, description,
          keywords, covers, main, date_published,
          date_modified, output_path, root_path, public_modules,
-         rss, assets) 
+         rss, assets)
         VALUES ($1, $2, $3, ARRAY[{}]::author[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)"#,
                 &authors_str
             )
         } else {
             format!(
                 r#"UPDATE posts SET
-        name = $1, title = $3, authors = ARRAY[{}]::author[], description = $4, 
-        keywords = $5, covers = $6, main = $7, date_published = $8, 
-        date_modified = $9, output_path = $10, root_path = $11, public_modules = $12, 
+        name = $1, title = $3, authors = ARRAY[{}]::author[], description = $4,
+        keywords = $5, covers = $6, main = $7, date_published = $8,
+        date_modified = $9, output_path = $10, root_path = $11, public_modules = $12,
         rss = $13, assets = $14
         WHERE permalink = $2"#,
                 &authors_str
@@ -75,7 +75,7 @@ pub async fn udpate_foil_db(foil: Foil, pool: Pool<Postgres>) -> JoinHandle<Resu
         };
 
         let resolved_main = foil.resolve_js_main();
-        let res = sqlx::query(&query)
+        let res = sqlx::query(sqlx::AssertSqlSafe(query))
             .bind(&foil.name)
             .bind(&foil.permalink)
             .bind(&foil.title)

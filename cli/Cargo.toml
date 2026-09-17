@@ -1,29 +1,30 @@
 [package]
 name = "foil_cli"
-version = "0.5.4"
+version = "0.5.5"
 authors = ["Alain Galvan <hi@alain.xyz>"]
 edition = "2024"
 
 [dependencies]
 async-std = { version = "1.13.x", features = ["attributes"] }
 chrono = { version = "0.4.x", features = ["serde"] }
-clap = "4.5.x"
+clap = "4.6.x"
 futures = "0.3.x"
 glob = "0.3.x"
-imagesize = "0.14.x"
-lexiclean = "0.0.1"
+imagesize = "0.15.x"
+lexiclean = "0.0.2"
 lazy_static = "1.5.x"
 path-slash = "0.2.x"
-rss = "2.0.x"
+rss = "2.1.x"
 serde = "1.0.x"
 serde_derive = "1.0.x"
 serde_json = "1.0.x"
-sqlx = { version = "0.8.x", features = [
+sqlx = { version = "0.9.x", features = [
     "bigdecimal",
     "chrono",
     "json",
     "postgres",
-    "runtime-async-std-rustls",
+    "runtime-async-std",
+    "tls-rustls",
     "rust_decimal",
     "time",
     "uuid",
