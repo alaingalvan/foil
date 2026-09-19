@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative } from "path";
 import { existsSync, readFileSync } from "fs";
 import Find from "find";
 const { fileSync } = Find;
-import { toList } from "dependency-tree";
+import dependencyTree from "dependency-tree";
 
 // 📃 Parse Args:
 // resolve-imports <root_path> <file>
@@ -58,7 +58,7 @@ function addDependencies(inputFile: string) {
     }
     resolvedImportSet.add(inputFile);
   } else if (inputFile.match(/\.(t|j)sx?$/)) {
-    let dependencies = toList({
+    let dependencies = dependencyTree.toList({
       filename: inputFile,
       directory: rootPath,
       filter: (path) => path.indexOf("node_modules") === -1,
