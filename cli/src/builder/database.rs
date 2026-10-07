@@ -3,13 +3,13 @@ use super::read_foil_package;
 use super::resolver::Foil;
 use crate::error::Result;
 use crate::return_err;
-use async_std::task::{spawn, JoinHandle};
+use async_std::task::{JoinHandle, spawn};
 use chrono::{DateTime, Utc};
-use futures::{future, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt, future};
 use lexiclean::Lexiclean;
 use path_slash::PathBufExt;
 use sqlx::Row;
-use sqlx::{postgres::PgRow, Pool, Postgres};
+use sqlx::{Pool, Postgres, postgres::PgRow};
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -129,41 +129,35 @@ pub async fn clean_database(pool: Pool<Postgres>) -> Result<()> {
             ))
         })
         .fetch(&pool)
-        .map_ok(
-            |(id, root_path, permalink)| match PathBuf::from_str(&root_path) {
+        .map_ok(|(id, root_path, permalink)| {
+            let should_delete = match PathBuf::from_str(&root_path) {
                 Ok(p) => {
                     let package_path = p.join("package.json");
                     let package_exists = package_path.exists();
                     let meta_exists = p.join("foil-meta.json").exists();
                     if !package_exists || !meta_exists {
-                        id
+                        true
                     } else {
                         match read_foil_package(&package_path) {
-                            Ok(pack) => {
-                                if pack.foil.permalink == permalink {
-                                    -1
-                                } else {
-                                    id
-                                }
-                            }
-                            Err(_e) => id,
+                            Ok(pack) => pack.foil.permalink != permalink,
+                            Err(_e) => true,
                         }
                     }
                 }
-                _ => -1,
-            },
-        )
-        .filter(|x| future::ready(x.is_ok() && *x.as_ref().unwrap() != -1));
-    let clean_ids = clean_stream.collect::<Vec<_>>().await;
-    for clean_id_result in clean_ids {
-        match clean_id_result {
-            Ok(id) => {
-                let _q = sqlx::query("DELETE FROM posts WHERE id = $1")
-                    .bind(id)
-                    .execute(&pool)
-                    .await?;
-            }
-            _ => (),
+                _ => false,
+            };
+            (should_delete, id, permalink)
+        })
+        .filter(|x| future::ready(x.is_ok() && x.as_ref().unwrap().0));
+
+    let to_delete = clean_stream.collect::<Vec<_>>().await;
+    for item in to_delete {
+        if let Ok((_, id, permalink)) = item {
+            println!("\n🗑️  Deleting stale post: `{}`", &permalink);
+            let _q = sqlx::query("DELETE FROM posts WHERE id = $1")
+                .bind(id)
+                .execute(&pool)
+                .await?;
         }
     }
 

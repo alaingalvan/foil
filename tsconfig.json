@@ -18,16 +18,8 @@
       "moduleResolution": "nodenext",
       "isolatedModules": true
     },
-    "ts-node": {
-      "transpileOnly": true,
-      "files": true,
-      "esm": true,
-      "experimentalResolver": true,
-      "experimentalSpecifierResolution": "node"
-    },
-    "include": ["src/**/*"],
+    "include": ["**/*"],
     "exclude": ["node_modules"],
     "compileOnSave": false,
     "buildOnSave": false
-  }
-  
+}
