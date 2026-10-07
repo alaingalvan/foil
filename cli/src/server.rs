@@ -4,12 +4,10 @@ use crate::error::Result;
 use crate::misc::connect_db;
 use crate::misc::{get_db_url, DATABASE_URL};
 use crate::query_post::query_post;
-use chrono::{DateTime, Utc};
 use lexiclean::Lexiclean;
 use path_slash::PathBufExt;
 use std::env;
-use std::fs;
-use std::fs::File;
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::process::{self, Child, Stdio};
@@ -101,11 +99,13 @@ pub async fn spawn_server() -> Result<Option<ServerChildren>> {
             fs::create_dir_all(&foil_cache_path)?;
             fs::create_dir_all(&foil_log_path)?;
 
-            // 🧻 Create log file for backend errors:
-            let date_now_string = log_stamp();
-            let backend_log_file = format!("foil-backend-log-{}.txt", &date_now_string);
-            let backend_log_file_abs = foil_log_path.clone().join(&backend_log_file);
-            let backend_file = File::create(backend_log_file_abs).unwrap();
+            // 🧻 Append backend errors to one log. Restarting used to stamp a new file.
+            let backend_log_file_abs = foil_log_path.join("foil-backend-log.txt");
+            let backend_file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&backend_log_file_abs)
+                .unwrap();
             let backend_stdio = Stdio::from(backend_file);
 
             // 🌐 Spawn child processes for the server:
@@ -161,18 +161,6 @@ pub async fn spawn_renderer_only() -> Result<Option<Child>> {
     spawn_renderer(&post, &cwd, &foil_builder_path, &foil_cache_path, &foil_log_path).await
 }
 
-fn log_stamp() -> String {
-    let dt = Utc::now();
-    let naive_utc = dt.naive_utc();
-    let offset = dt.offset().clone();
-    let date_now = DateTime::<Utc>::from_naive_utc_and_offset(naive_utc, offset);
-    date_now
-        .to_string()
-        .replace(":", "_")
-        .replace(" ", "_")
-        .replace(".", "_")
-}
-
 async fn spawn_renderer(
     post: &crate::query_post::SQLPost,
     cwd: &PathBuf,
@@ -219,9 +207,13 @@ async fn spawn_renderer(
     let builder_node_modules = clean_path_string(&foil_builder_path.join("node_modules"));
     let node_path_str = builder_node_modules + ";" + &cwd_node_modules;
 
-    let renderer_log_file = format!("foil-renderer-log-{}.txt", log_stamp());
-    let renderer_log_file_abs = foil_log_path.clone().join(&renderer_log_file);
-    let renderer_log = File::create(&renderer_log_file_abs).unwrap();
+    // One rolling file. Restarting the server used to stamp a new log every time.
+    let renderer_log_file_abs = foil_log_path.join("foil-renderer-log.txt");
+    let renderer_log = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&renderer_log_file_abs)
+        .unwrap();
 
     let mut backend_renderer_child = process::Command::new("node")
         .current_dir(cwd)
