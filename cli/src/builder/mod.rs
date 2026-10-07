@@ -25,6 +25,20 @@ use std::path::PathBuf;
 use std::process::Child;
 use std::time::Instant;
 
+/// Foils whose metadata says a source, runtime, or public module changed.
+pub fn changed_foils(resolved: Vec<(Foil, FoilMetadata)>, build_mode: &BuildMode) -> Vec<Foil> {
+    resolved
+        .into_iter()
+        .filter_map(|(foil, metadata)| {
+            if metadata.verify(&foil, build_mode.clone()).changed() {
+                Some(foil)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 //=====================================================================================================================
 /// Process the current working directory for Foil projects.
 pub async fn build(build_mode: BuildMode) -> Result<()> {
