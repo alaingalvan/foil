@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "lib": ["dom", "es2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmitHelpers": false,
+    "noImplicitAny": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "strictNullChecks": false,
+    "target": "es2022"
+  },
+  "exclude": ["node_modules", "dist"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

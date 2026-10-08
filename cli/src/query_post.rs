@@ -23,24 +23,11 @@ pub struct SQLPost {
     pub public_modules: Vec<String>,
 }
 
-/// Build an RSS document based on the root permalink's publicly exposed RSS subdirectories.
 pub async fn query_post(pool: &Pool<Postgres>, permalink: String) -> Result<SQLPost, sqlx::Error> {
     let found_root_post: Result<SQLPost, sqlx::Error> =
         sqlx::query_as(include_str!("sql/post_from_permalink.sql"))
             .bind(&permalink)
             .fetch_one(pool)
-            .await;
-    found_root_post
-}
-
-pub async fn query_posts(
-    pool: &Pool<Postgres>,
-    permalink: String,
-) -> Result<Vec<SQLPost>, sqlx::Error> {
-    let found_root_post: Result<Vec<SQLPost>, sqlx::Error> =
-        sqlx::query_as(include_str!("sql/posts_from_glob.sql"))
-            .bind(&permalink)
-            .fetch_all(pool)
             .await;
     found_root_post
 }

@@ -2,13 +2,14 @@
 
 This repo is not one project. The root has no `Cargo.toml` and no `package.json`. Do not run `cargo`, `npm`, or `tsc` from the repo root.
 
-There are three independent projects. Change and build only the one the task touches.
+There are four independent projects. Change and build only the one the task touches.
 
 | Project | Path | What it is | Build |
 | --- | --- | --- | --- |
 | CLI | [cli](cli) | Rust binary `foil_cli`. Builds a foil site, watches it, and starts the server. | `cargo check --manifest-path cli/Cargo.toml` |
 | Builder | [cli/builder](cli/builder) | Node package `@foil-cms/builder`. Webpack/TypeScript bundler invoked by the CLI. | `npm start` in `cli/builder` |
 | Backend | [backend](backend) | Rust binary `foil_backend`. Axum/GraphQL server. Separate crate, separate `target/`. | `cargo check --manifest-path backend/Cargo.toml` |
+| RSS | [rss](rss) | Node package `@foil-cms/rss`. Generates `rss.xml` from the post database. | `npm start` in `rss` |
 
 `cli/src/server.rs` is not the backend. It is CLI code that spawns `foil_backend` and a Node renderer.
 
@@ -28,12 +29,13 @@ cargo test --manifest-path cli/Cargo.toml --bin foil_cli
 cargo test --manifest-path backend/Cargo.toml --bin foil_backend
 ```
 
-CI builds the three projects as separate jobs. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
+CI builds the four projects as separate jobs. See [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Where to edit
 
-- CLI commands, build, watch, database cache, RSS: [cli/src](cli/src). `cli/src/builder` is a Rust module, not [cli/builder](cli/builder).
+- CLI commands, build, watch, database cache: [cli/src](cli/src). `cli/src/builder` is a Rust module, not [cli/builder](cli/builder).
 - Webpack, import maps, SystemJS, MDX bundling: [cli/builder/src](cli/builder/src).
 - HTTP, GraphQL, static routing, reverse proxy to the Node renderer: [backend/src](backend/src).
+- RSS generation: [rss/src](rss/src). Run `foil-rss generate` after `foil build`. The CLI does not write `rss.xml`.
 
 Product usage is in [readme.md](readme.md). Design notes are in [docs/design-decisions.md](docs/design-decisions.md).

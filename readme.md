@@ -31,6 +31,9 @@ From there, visit the [releases](/releases) page for built binaries, and expose 
 # 🛠️ Build your foil project, both the frontend and the portfolio, whatever's changed recently.
 foil-cli build # --dev (optional)
 
+# 🌊 Generate the RSS feed after a build.
+foil-rss generate
+
 # 🏃‍♂️ start the foil server.
 foil-cli server start
 
@@ -45,6 +48,7 @@ foil-cli server reset
 | `FOIL_DATABASE_URL` | `postgres://localhost/foil` | What postgres database to write the foil post cache to. |
 | `FOIL_HOSTNAME`     | `127.0.0.1`                 | Your hostname. Defaults to localhost.                   |
 | `FOIL_PORT`         | `4017`                      | Default port for the foil backend server.               |
+| `FOIL_SITE_URL`     |                             | Absolute site origin used by `foil-rss generate`.       |
 
 [license-img]: https://img.shields.io/:license-mit-blue.svg?style=flat-square
 [license-url]: https://opensource.org/license/mit/

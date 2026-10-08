@@ -1,0 +1,43 @@
+{
+  "name": "@foil-cms/rss",
+  "version": "0.5.5",
+  "description": "Generate a Foil RSS feed from the post database and statically rendered React posts.",
+  "author": "Alain Galvan <hi@alain.xyz>",
+  "license": "SEE LICENSE IN ../license.md",
+  "type": "module",
+  "source": "src/main.ts",
+  "main": "dist/main.js",
+  "exports": "./dist/main.js",
+  "bin": {
+    "foil-rss": "dist/main.js"
+  },
+  "scripts": {
+    "start": "tsc --noCheck",
+    "test": "tsx --test test/*.test.ts test/*.test.tsx"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alaingalvan/foil.git"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "dependencies": {
+    "pg": "^8.16.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "systemjs": "=6.15.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.1",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tsx": "^4.23.13",
+    "typescript": "6.0.2"
+  }
+}

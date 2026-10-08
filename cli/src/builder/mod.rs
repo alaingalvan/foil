@@ -5,7 +5,6 @@ mod database;
 mod metadata;
 mod nodejs;
 mod resolver;
-mod rss;
 mod static_assets;
 mod watcher;
 
@@ -136,9 +135,6 @@ pub async fn build(build_mode: BuildMode) -> Result<()> {
     // Join all async threads here.
     futures::future::join_all(update_futures).await;
     futures::future::join_all(write_futures).await;
-
-    // 🌊 Write the RSS output for this foil project.
-    rss::build_rss(pool.clone()).await;
 
     for mut child in build_children {
         child.wait().expect("Failed to run Foil Builder...");
