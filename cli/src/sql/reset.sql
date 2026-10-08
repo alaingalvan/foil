@@ -1,10 +1,17 @@
+-- Reset the foil post cache. This is not a migration: `foil server reset` runs it directly.
+DROP TABLE IF EXISTS posts;
+
+DROP TYPE IF EXISTS author CASCADE;
+
+DROP TYPE IF EXISTS redirect CASCADE;
+
 CREATE TYPE author AS (
     name varchar(254),
     email varchar(254),
     url varchar(254)
 );
 
-CREATE TABLE IF NOT EXISTS posts (
+CREATE TABLE posts (
     id serial PRIMARY KEY NOT NULL,
     name varchar(254) NOT NULL UNIQUE,
     permalink varchar(254) NOT NULL UNIQUE,
@@ -22,5 +29,8 @@ CREATE TABLE IF NOT EXISTS posts (
     rss varchar(254)[] NOT NULL,
     assets varchar(254)[] NOT NULL
 );
+
+CREATE INDEX posts_permalink_lower_idx
+ON posts (LOWER(permalink));
 
 SET CLIENT_ENCODING TO 'utf8';
