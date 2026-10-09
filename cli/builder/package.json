@@ -1,6 +1,6 @@
 {
   "name": "@foil-cms/builder",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "✨ Foil's package builder, bundle your application runtime or build foil libraries.",
   "author": "Alain Galvan <hi@alain.xyz>",
   "license": "SEE LICENSE IN ../../license.md",
@@ -18,7 +18,7 @@
     "foil-builder": "dist/src/foil-builder.js"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=24"
   },
   "repository": {
     "type": "git",

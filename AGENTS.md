@@ -17,7 +17,7 @@ There are four independent projects. Change and build only the one the task touc
 
 - `cli` and `backend` are separate Cargo crates. A change in one does not compile the other. Do not add a workspace `Cargo.toml` unless asked.
 - `cli/builder` is not part of the CLI crate. Rust does not compile it. The CLI shells out to its `dist/`.
-- Root [tsconfig.json](tsconfig.json) and [build.js](build.js) are not the builder. `build.js` only packages release binaries. The builder uses [cli/builder/tsconfig.json](cli/builder/tsconfig.json) and `npm start`.
+- Root [tsconfig.json](tsconfig.json) and [build.ts](build.ts) are not the builder. `node build.ts` only packages release binaries. The builder uses [cli/builder/tsconfig.json](cli/builder/tsconfig.json) and `npm start`.
 - `build/` and every `target/` are outputs. Do not edit them.
 
 ## Tests

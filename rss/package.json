@@ -1,6 +1,6 @@
 {
   "name": "@foil-cms/rss",
-  "version": "0.5.5",
+  "version": "0.6.0",
   "description": "Generate a Foil RSS feed from the post database and statically rendered React posts.",
   "author": "Alain Galvan <hi@alain.xyz>",
   "license": "SEE LICENSE IN ../license.md",
@@ -16,7 +16,7 @@
     "test": "tsx --test test/*.test.ts test/*.test.tsx"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "repository": {
     "type": "git",
