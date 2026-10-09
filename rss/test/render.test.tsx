@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { renderPost } from "../src/render.ts";
+import { frontendImportMap, renderPost } from "../src/render.ts";
 import type { Post } from "../src/types.ts";
 
 function post(root: string, overrides: Partial<Post> = {}): Post {
@@ -31,15 +31,17 @@ describe("render", () => {
     const root = join(tmpdir(), "foil-rss-render");
     const output = join(root, "public");
     await mkdir(join(output, "react"), { recursive: true });
+    await mkdir(join(output, "react-dom/server"), { recursive: true });
     await writeFile(
       join(output, "main.js"),
-      `System.register(["react"], function (exports, module) {
-        var createElement;
+      `System.register(["react"], function (exports) {
+        var useContext;
         return {
-          setters: [function (react) { createElement = react.createElement; }],
+          setters: [function (react) { useContext = react.useContext; }],
           execute: function () {
             exports("default", function Note() {
-              return createElement("p", null, "Full article");
+              if (useContext() !== "same-react") throw new Error("useContext");
+              return "article";
             });
           },
         };
@@ -48,25 +50,39 @@ describe("render", () => {
     await writeFile(
       join(output, "react.js"),
       `System.register([], function (exports) {
-        return {
-          execute: function () {
-            exports("createElement", function (type, _props, child) {
-              return { $$typeof: Symbol.for("react.transitional.element"), type: type, props: { children: child }, key: null, ref: null };
-            });
-          },
-        };
+        return { execute: function () { exports("useContext", function () { return "same-react"; }); } };
       });`,
     );
     await writeFile(
       join(output, "react/jsx-runtime.js"),
       `System.register([], function (exports) {
-        return { execute: function () { exports("jsx", React.createElement); } };
+        return { execute: function () { exports("jsx", function (type) { return type(); }); } };
+      });`,
+    );
+    await writeFile(
+      join(output, "react-dom/server.js"),
+      `System.register([], function (exports) {
+        return {
+          execute: function () {
+            if (typeof require !== "function") throw new Error("require is not defined");
+            exports("renderToStaticMarkup", function (node) { return "<p>" + node + "</p>"; });
+          },
+        };
       });`,
     );
 
-    const frontend = post(root, { name: "site", permalink: "/", main: "src/main.tsx" });
+    const frontend = post(root, {
+      name: "site",
+      permalink: "/",
+      main: "src/main.tsx",
+      publicModules: ["react", "react/jsx-runtime", "react-dom/server"],
+    });
+    const imports = frontendImportMap(frontend);
+    assert.equal(imports.site, `file:///${join(output, "main.js").replaceAll("\\", "/")}`);
+    assert.equal(imports["react-dom/server"], `file:///${join(output, "react-dom/server.js").replaceAll("\\", "/")}`);
+
     const rendered = await renderPost(post(root), frontend);
-    assert.equal(rendered.html, "<p>Full article</p>");
+    assert.equal(rendered.html, "<p>article</p>");
 
     const shellDir = join(root, "shell");
     await mkdir(shellDir, { recursive: true });

@@ -30,10 +30,11 @@ async function generate(): Promise<void> {
   }
 
   const xml = buildFeed(root, rendered, origin);
-  const directory = join(root.rootPath, root.outputPath);
-  await mkdir(directory, { recursive: true });
-  const output = join(directory, "rss.xml");
+
+  await mkdir(root.outputPath, { recursive: true });
+  const output = join(root.outputPath, "rss.xml");
   await writeFile(output, xml, "utf8");
+
   console.log(`Wrote ${output}`);
 }
 
