@@ -7,9 +7,6 @@ use std::path::PathBuf;
 const FOIL_META_FILE: &str = "foil-meta.json";
 
 /// Delete `foil-meta.json` for every post about to be removed from the database.
-///
-/// Roots come from `posts.root_path`, the same path a build writes metadata to.
-/// A missing file is fine: the post may never have been built.
 async fn clear_post_metadata(pool: &Pool<Postgres>) -> Result<()> {
     let roots: Vec<String> = match sqlx::query_scalar("SELECT root_path FROM posts")
         .fetch_all(pool)
@@ -28,15 +25,13 @@ async fn clear_post_metadata(pool: &Pool<Postgres>) -> Result<()> {
         return Ok(());
     }
 
-    println!("🗑️  Clearing metadata for {} post(s)...", roots.len());
+    println!("🗑️ Clearing metadata for {} post(s)...", roots.len());
     for root in roots {
         let meta_path = PathBuf::from(&root).join(FOIL_META_FILE);
         match fs::remove_file(&meta_path) {
-            Ok(()) => println!("🗑️  Removed {}", meta_path.display()),
+            Ok(()) => println!("🗑️ Removed {}", meta_path.display()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => {
-                eprintln!("Warning: Failed to remove {}: {}", meta_path.display(), e);
-            }
+            Err(e) => ()
         }
     }
 
