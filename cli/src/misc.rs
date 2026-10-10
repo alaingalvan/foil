@@ -1,6 +1,29 @@
 use crate::error::Result;
 use sqlx::{Pool, Postgres};
 use std::env;
+use std::thread;
+
+/// async-std's default task stack is 1 MiB, which is smaller than one sqlx 0.9
+/// postgres query future. Callers that poll sqlx run on this larger stack.
+const SQL_STACK_SIZE: usize = 8 * 1024 * 1024;
+
+/// Poll `work` on a thread whose stack can hold a sqlx 0.9 query future.
+/// `async_std::task::spawn` still uses the 1 MiB worker stack, so this must be
+/// a dedicated thread with its own runtime.
+pub fn run_on_sql_stack<T, F>(name: &str, work: F) -> Result<T>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T> + Send + 'static,
+{
+    let handle = thread::Builder::new()
+        .name(name.to_string())
+        .stack_size(SQL_STACK_SIZE)
+        .spawn(work)
+        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+    handle
+        .join()
+        .unwrap_or_else(|_| Err(format!("{name} thread panicked").into()))
+}
 
 /// The Foil database URL environment variable name.
 pub const DATABASE_URL: &'static str = "FOIL_DATABASE_URL";

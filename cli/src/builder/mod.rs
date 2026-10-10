@@ -41,6 +41,14 @@ pub fn changed_foils(resolved: Vec<(Foil, FoilMetadata)>, build_mode: &BuildMode
 //=====================================================================================================================
 /// Process the current working directory for Foil projects.
 pub async fn build(build_mode: BuildMode) -> Result<()> {
+    // `spawn` still polls on async-std's 1 MiB worker stacks. A dedicated thread
+    // gets its own runtime, so the sqlx future is polled on this larger stack.
+    crate::misc::run_on_sql_stack("foil-build", move || {
+        async_std::task::block_on(build_on_thread(build_mode))
+    })
+}
+
+async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
     // 📚 Configure database...
     let pool = connect_db().await?;
     let cwd = env::current_dir().unwrap_or_default();
