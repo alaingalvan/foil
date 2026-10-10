@@ -125,11 +125,10 @@ pub async fn resolve_foil(cur_path_package: PathBuf) -> JoinHandle<Option<(Foil,
         // 🌟 We've found a foil project, attempt to foilify it and process it later.
         match read_foil_package(&cur_path_package) {
             Ok(v) => {
-                match process_foil_project(v, &cur_path_root) {
+                // 🔒 Load foil-meta file and compare source file path/modified date.
+                let foil_metadata = FoilMetadata::open(cur_path_root.join("foil-meta.json"));
+                match process_foil_project(v, &cur_path_root, &foil_metadata) {
                     Ok(resolved_foil) => {
-                        // 🔒 Load foil-meta file and compare source file path/modified date.
-                        let foil_lock_path = resolved_foil.root_path.join("foil-meta.json");
-                        let foil_metadata = FoilMetadata::open(foil_lock_path);
                         return Some((resolved_foil, foil_metadata));
                     }
                     Err(_er) => (),
@@ -189,9 +188,16 @@ pub async fn resolve_foils(
 
 //=====================================================================================================================
 /// Process a given foil package and resolve it.
-fn process_foil_project(package: NodePackage, path: &PathBuf) -> Result<Foil> {
-    // 🚢 Resolve source file imports:
-    let source_files = find_all_imports(package.main.clone(), &path);
+fn process_foil_project(
+    package: NodePackage,
+    path: &PathBuf,
+    metadata: &FoilMetadata,
+) -> Result<Foil> {
+    // 🚢 Resolve source file imports, spawning Node only if a recorded file changed:
+    let source_files = match metadata.unchanged_source_files() {
+        Some(files) => files,
+        None => find_all_imports(package.main.clone(), &path),
+    };
 
     // 🚪 Determine output path, can either be current foil package path, or specified by the project configuration.
     let mut output_path = path.clone();

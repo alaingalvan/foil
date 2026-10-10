@@ -99,6 +99,20 @@ pub fn find_all_imports(main: String, root_path: &PathBuf) -> Vec<FoilFile> {
 }
 
 //=====================================================================================================================
+/// `npm ci` deletes and reinstalls `node_modules`, so only run it when the install is missing or older than the lock file.
+fn needs_install(root_path: &PathBuf) -> bool {
+    let modified = |p: PathBuf| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+    let Some(installed) = modified(root_path.join("node_modules").join(".package-lock.json"))
+    else {
+        return true;
+    };
+    ["package-lock.json", "package.json"]
+        .iter()
+        .filter_map(|name| modified(root_path.join(name)))
+        .any(|source| source > installed)
+}
+
+//=====================================================================================================================
 /// 🍱 Compile a given foil module with Webpack.
 pub fn compile_foil_main(
     mode: BuildMode,
@@ -106,12 +120,17 @@ pub fn compile_foil_main(
     foil_changed: FoilMetadataStatus,
 ) -> Result<Child> {
     // ⤵️ Install all dependencies for this project if they don't exist.
-    let _ci = match Command::new(NPM)
-        .current_dir(&resolved_foil.root_path)
-        .arg("ci")
-        .arg("--include=dev")
-        .output()
-    {
+    let _ci = if !needs_install(&resolved_foil.root_path) {
+        Ok(())
+    } else {
+        Command::new(NPM)
+            .current_dir(&resolved_foil.root_path)
+            .arg("ci")
+            .arg("--include=dev")
+            .output()
+            .map(|_| ())
+    };
+    let _ci = match _ci {
         Ok(_) => (),
         Err(_e) => {
             // There may not be a package-lock.json file, add one:

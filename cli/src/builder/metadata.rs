@@ -68,6 +68,21 @@ impl FoilMetadata {
         metadata
     }
 
+    /// The recorded source files, if every one still exists with the same modified date and `package.json` is among them.
+    /// Lets us skip spawning Node to re-resolve imports.
+    pub fn unchanged_source_files(&self) -> Option<Vec<FoilFile>> {
+        if self.files.is_empty() || !self.files.iter().any(|f| f.path.ends_with("/package.json")) {
+            return None;
+        }
+        for file in self.files.iter() {
+            let modified = fs::metadata(&file.path).and_then(|m| m.modified()).ok()?;
+            if chrono::DateTime::<chrono::Utc>::from(modified) != file.modified_date {
+                return None;
+            }
+        }
+        Some(self.files.clone())
+    }
+
     /// Verify if source files have changed, this can happen if there's additional files or any existing files have been modified.
     fn verify_source_files(&self, foil: &Foil) -> bool {
         let mut source_files = foil.source_files.clone();
