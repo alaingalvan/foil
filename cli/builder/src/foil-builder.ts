@@ -257,13 +257,13 @@ ${args.publicModules.reduce(
 
   // 📚 Build vendor libraries:
   if (args.publicModules.length > 0 && args.vendor) {
-    for (let m of args.publicModules) {
+    await Promise.all(args.publicModules.map((m) => {
       let web = /((server)|(ssr))/.exec(m) === null;
       let externals = args.publicModules.reduce(
         (prev, cur) => (m != cur ? { ...prev, [cur]: cur } : prev),
         {}
       );
-      await build(`📚 ${m} (${web ? 'web' : 'server'})`, {
+      return build(`📚 ${m} (${web ? 'web' : 'server'})`, {
         mode: nodeEnvStr,
         target: web ? 'web' : 'node',
         entry: m,
@@ -339,7 +339,7 @@ ${args.publicModules.reduce(
           minimize: args.production ? true : false
         }
       });
-    }
+    }));
   }
 
   // ✨ Build main target:
