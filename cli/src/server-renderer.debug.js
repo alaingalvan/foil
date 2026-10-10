@@ -115,6 +115,8 @@ const foilRequestHandler = async (request, response) => {
         foilReport('uncaught', error, info);
       },
       onRecoverableError: function (error, info) {
+        var message = String((error && error.message) || error);
+        if (message.indexOf('synchronously rendering the entire root') !== -1) return;
         console.error(error);
         foilReport('recoverable', error, info);
       },
