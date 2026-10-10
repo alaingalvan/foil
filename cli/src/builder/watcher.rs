@@ -38,7 +38,7 @@ pub async fn watch(build_mode: BuildMode) -> Result<()> {
                 if !start_foils.is_empty() {
                     build(build_mode.clone()).await?;
                 }
-                children = start_server(children).await?;
+                children = start_server(children, &build_mode).await?;
                 println!("\n👀 · Watching for changes... · \n");
                 watched = snapshot_sources(&cwd).await?;
                 state = WatcherState::Watching;
@@ -57,7 +57,7 @@ pub async fn watch(build_mode: BuildMode) -> Result<()> {
             WatcherState::Processing => {
                 if let Err(err) = build(build_mode.clone()).await {
                     println!("\n❌ Build failed, server renderer left running.\n{}", err);
-                } else if let Err(err) = restart_renderer(&mut children).await {
+                } else if let Err(err) = restart_renderer(&mut children, &build_mode).await {
                     println!("\n❌ Failed to restart server renderer.\n{}", err);
                 }
                 state = WatcherState::Done;
@@ -77,20 +77,32 @@ async fn resolve_changed(cwd: &PathBuf, build_mode: &BuildMode) -> Result<Vec<Fo
     Ok(changed_foils(resolved, build_mode))
 }
 
-async fn start_server(children: Option<ServerChildren>) -> Result<Option<ServerChildren>> {
+async fn start_server(
+    children: Option<ServerChildren>,
+    build_mode: &BuildMode,
+) -> Result<Option<ServerChildren>> {
     if children.is_some() {
         return Ok(children);
     }
-    server::spawn_server().await
+    let build_mode = build_mode.clone();
+    crate::misc::run_on_sql_stack("foil-watch-server", move || {
+        task::block_on(server::spawn_server(build_mode))
+    })
 }
 
-async fn restart_renderer(children: &mut Option<ServerChildren>) -> Result<()> {
+async fn restart_renderer(
+    children: &mut Option<ServerChildren>,
+    build_mode: &BuildMode,
+) -> Result<()> {
     let Some(current) = children.as_mut() else {
-        *children = server::spawn_server().await?;
+        *children = start_server(None, build_mode).await?;
         return Ok(());
     };
     server::stop_child(&mut current.renderer);
-    if let Some(renderer) = server::spawn_renderer_only().await? {
+    let build_mode = build_mode.clone();
+    if let Some(renderer) = crate::misc::run_on_sql_stack("foil-watch-renderer", move || {
+        task::block_on(server::spawn_renderer_only(build_mode))
+    })? {
         current.renderer = renderer;
     }
     Ok(())
