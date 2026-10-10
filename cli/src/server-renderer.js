@@ -93,5 +93,7 @@ const foilRequestHandler = async (request, response) => {
 
 // ====================================================================================================================
 const server = createServer(foilRequestHandler);
-server.listen(4011, "127.0.0.1", () => { });
+server.listen(4011, "127.0.0.1", () => {
+  console.log("🌠 Foil Renderer running in http://127.0.0.1:4011");
+});
 
