@@ -6,6 +6,8 @@ use std::io;
 use std::path::PathBuf;
 use std::process::{self, Child, Stdio};
 
+const TRACE_WARNINGS: &str = "FOIL_TRACE_WARNINGS";
+
 pub(super) async fn spawn_renderer(
     post: &crate::query_post::SQLPost,
     cwd: &PathBuf,
@@ -37,9 +39,6 @@ pub(super) async fn spawn_renderer(
         frontend_main, import_map_str, renderer_js
     );
 
-    // Due to the idiosyncrasies of Node.js and TypeScript, we must generate and load a renderer file:
-    // Also, due to the way node resolves modules, it must exist next to the frontend.
-    // We may want to clear this cache path in the future...
     let server_source_file = frontend_main + "-renderer.generated.mjs";
     let server_source_file_abs = foil_cache_path.clone().join(&server_source_file);
     let server_source_file_abs_str = clean_path_string(&server_source_file_abs);
@@ -64,15 +63,20 @@ pub(super) async fn spawn_renderer(
         .open(&renderer_log_file_abs)
         .unwrap();
 
+    // --no-warnings would swallow --trace-warnings, so only one is ever passed.
+    let trace_warnings = *build_mode == BuildMode::Development
+        || std::env::var(TRACE_WARNINGS).is_ok_and(|v| !v.is_empty() && v != "0");
+    let warning_flag = if trace_warnings {
+        "--trace-warnings"
+    } else {
+        "--no-warnings"
+    };
+
     let mut backend_renderer_child = process::Command::new("node")
         .current_dir(cwd)
         .env("NODE_PATH", node_path_str)
         .args([
-            "--experimental-specifier-resolution=node",
-            "--experimental-modules",
-            "--experimental-import-meta-resolve",
-            "--no-warnings",
-            "--trace-warnings",
+            warning_flag,
             &server_source_file_abs_str,
         ])
         .stdout(Stdio::piped())
