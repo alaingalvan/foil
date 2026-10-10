@@ -1,23 +1,23 @@
-import { join, resolve, parse } from "path";
-import { argv } from "process";
+import { join, resolve, parse } from 'path';
+import { argv } from 'process';
 import {
   stat as statCallback,
   mkdir as mkdirCallback,
-  writeFile as writeFileCallback,
-} from "fs";
-import { promisify } from "util";
-import chalk from "chalk";
+  writeFile as writeFileCallback
+} from 'fs';
+import { promisify } from 'util';
+import chalk from 'chalk';
 const { gray, green, cyan, red } = chalk;
-import webpack, { Configuration, Compiler } from "webpack";
+import webpack, { Configuration, Compiler } from 'webpack';
 const { DefinePlugin } = webpack;
-import MiniCssExtractPlugin from "mini-css-extract-plugin";
-import CssMinimizerPlugin from "css-minimizer-webpack-plugin";
-import rehypeKatex from "rehype-katex";
-import rehypeSlug from "rehype-slug";
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
+import CssMinimizerPlugin from 'css-minimizer-webpack-plugin';
+import rehypeKatex from 'rehype-katex';
+import rehypeSlug from 'rehype-slug';
 
-import remarkCode from "./misc/remark-code";
-import remarkMath from "remark-math";
-import remarkGfm from "remark-gfm";
+import remarkCode from './misc/remark-code';
+import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 
 const mkdir = promisify(mkdirCallback);
 const writeFile = promisify(writeFileCallback);
@@ -30,23 +30,23 @@ const stat = promisify(statCallback);
 
 const kebab = (str) =>
   str
-    .replace(/\-/, "") //replace all special chars
-    .replace(/\s\s+/, " ") //replace multi-spaces
-    .replace(/([a-z])([A-Z])/g, "$1-$2") // get all lowercase letters that are near to uppercase ones
-    .replace(/[\s_]+/g, "-") // replace all spaces and low dash
+    .replace(/\-/, '') //replace all special chars
+    .replace(/\s\s+/, ' ') //replace multi-spaces
+    .replace(/([a-z])([A-Z])/g, '$1-$2') // get all lowercase letters that are near to uppercase ones
+    .replace(/[\s_]+/g, '-') // replace all spaces and low dash
     .toLowerCase(); // convert to lower case
 
 let args = {
   // Main name,
-  name: "",
+  name: '',
   // Main title
-  mainTitle: "",
+  mainTitle: '',
   // Current build root folder.
-  rootPath: "",
+  rootPath: '',
   // Input bundle file.
-  input: "",
+  input: '',
   // Output bundle file name.
-  output: "",
+  output: '',
   // Build the systemJS runtime.
   system: false,
   // Build the import map and expose it in the output folder.
@@ -56,14 +56,14 @@ let args = {
   // Build vendor modules.
   vendor: false,
   // Build in production mode.
-  production: false || process?.env["NODE_ENV"]?.match(/production/) != null,
+  production: false || process?.env['NODE_ENV']?.match(/production/) != null
 };
 for (let i = 0; i < argv.length; i++) {
   let arg = argv[i];
   // Arg matches --args map:
   let found: string = Object.keys(args).reduce(
-    (p, c) => ("--" + kebab(c) === arg ? c : p),
-    "",
+    (p, c) => ('--' + kebab(c) === arg ? c : p),
+    ''
   );
   if (found.length > 0) {
     if (Array.isArray(args[found])) {
@@ -73,8 +73,8 @@ for (let i = 0; i < argv.length; i++) {
         i++;
         if (i < argv.length) {
           let notFoundForward = !Object.keys(args).reduce(
-            (p, c) => p || ("--" + kebab(c) === argv[i] ? true : false),
-            false,
+            (p, c) => p || ('--' + kebab(c) === argv[i] ? true : false),
+            false
           );
           if (notFoundForward) {
             args[found].push(argv[i]);
@@ -85,11 +85,11 @@ for (let i = 0; i < argv.length; i++) {
           lookForward = false;
         }
       }
-    } else if (typeof args[found] === "string") {
+    } else if (typeof args[found] === 'string') {
       if (i + 1 < argv.length) {
         args[found] = argv[i + 1];
       }
-    } else if (typeof args[found] == "boolean") {
+    } else if (typeof args[found] == 'boolean') {
       args[found] = true;
     }
   }
@@ -98,25 +98,25 @@ for (let i = 0; i < argv.length; i++) {
 // Fail if missing required arguments:
 if (args.rootPath.length <= 0) {
   console.error(
-    "foil-builder --root-path <path> --system --vendor --input <main> --output <dir>",
+    'foil-builder --root-path <path> --system --vendor --input <main> --output <dir>'
   );
   process.exit(1);
 }
 //=====================================================================================================================
 // Setup globals:
-const nodeEnvStr: any = args.production ? "production" : "development";
+const nodeEnvStr: any = args.production ? 'production' : 'development';
 const buildDir = args.output;
 const buildDirAbs = join(args.rootPath, buildDir);
 // TODO: Load join(args.rootPath, "tsconfig.json"), then root foil's tsconfig, then builder's tsconfig.
-let tsConfigFile: string = "";
+let tsConfigFile: string = '';
 const mainTitle =
   args.mainTitle.length < 1 ? parse(args.input).name : args.mainTitle;
 const libraryName = args.name.length < 1 ? kebab(mainTitle) : args.name;
 
 // ⚙️ Find the best tsconfig file
 const possibleTsConfigs = [
-  join(args.rootPath, "tsconfig.json"),
-  join(process.cwd(), "tsconfig.json"),
+  join(args.rootPath, 'tsconfig.json'),
+  join(process.cwd(), 'tsconfig.json')
 ];
 
 async function findTsConfig() {
@@ -129,7 +129,7 @@ async function findTsConfig() {
     }
   }
 
-  return "";
+  return '';
 }
 
 tsConfigFile = await findTsConfig();
@@ -137,8 +137,8 @@ tsConfigFile = await findTsConfig();
 if (!tsConfigFile) {
   console.error(
     chalk.red(
-      `❌ Error: Could not find a tsconfig.json in ${args.rootPath} or the current working directory.`,
-    ),
+      `❌ Error: Could not find a tsconfig.json in ${args.rootPath} or the current working directory.`
+    )
   );
   process.exit(1);
 }
@@ -158,7 +158,7 @@ function build(title, config: Configuration) {
       if (stats.hasErrors()) {
         let statsJson = stats.toJson();
         console.log(
-          "❌" + red(" · Error · ") + buildTitle + " failed to compile:",
+          '❌' + red(' · Error · ') + buildTitle + ' failed to compile:'
         );
         for (let error of statsJson.errors) {
           console.warn(error.message);
@@ -166,11 +166,11 @@ function build(title, config: Configuration) {
         return rej();
       }
       console.log(
-        "✔️️" +
-          green("  · Success · ") +
+        '✔️️' +
+          green('  · Success · ') +
           buildTitle +
-          " built in " +
-          cyan(+stats.endTime - +stats.startTime + " ms."),
+          ' built in ' +
+          cyan(+stats.endTime - +stats.startTime + ' ms.')
       );
       return res(stats);
     };
@@ -183,23 +183,23 @@ function build(title, config: Configuration) {
 async function main() {
   // ⚙️ Build Import Map
   if (args.inputMap) {
-    const importMap = join(buildDirAbs, "importmap.json");
+    const importMap = join(buildDirAbs, 'importmap.json');
     const importMapData = `{
   "imports": {
     "${libraryName}": "${
-      join(args.output, "main").replace(/\\/g, "/") + ".js"
-    }"${args.publicModules.length > 0 ? "," : ""}
+      join(args.output, 'main').replace(/\\/g, '/') + '.js'
+    }"${args.publicModules.length > 0 ? ',' : ''}
 ${args.publicModules.reduce(
   (acc, m, i) =>
     acc +
     '    "' +
     m +
     '": "' +
-    (join(args.output, m).replace(/\\/g, "/") + ".js") +
+    (join(args.output, m).replace(/\\/g, '/') + '.js') +
     '"' +
-    (i < args.publicModules.length - 1 ? "," : "") +
-    "\n",
-  "",
+    (i < args.publicModules.length - 1 ? ',' : '') +
+    '\n',
+  ''
 )}
   }
 }`;
@@ -210,13 +210,13 @@ ${args.publicModules.reduce(
       await mkdir(buildDirAbs, { recursive: true });
     }
 
-    await writeFile(importMap, importMapData, "utf8");
+    await writeFile(importMap, importMapData, 'utf8');
 
     console.log(
-      "✔️️" +
-        green("  · Success · ") +
-        " ⚙️ SystemJS input map built to:\n" +
-        importMap,
+      '✔️️' +
+        green('  · Success · ') +
+        ' ⚙️ SystemJS input map built to:\n' +
+        importMap
     );
   }
 
@@ -227,31 +227,31 @@ ${args.publicModules.reduce(
     compilerOptions: {
       sourceMap: !args.production,
       rootDir: args.rootPath,
-      module: "ESNext",
-      moduleResolution: "Bundler",
-    },
+      module: 'ESNext',
+      moduleResolution: 'Bundler'
+    }
   };
 
   // 🌄 Build SystemJS runtime:
   if (args.system) {
-    let suffix = args.production ? ".min" : "";
-    await build("🌄 SystemJS", {
+    let suffix = args.production ? '.min' : '';
+    await build('🌄 SystemJS', {
       mode: nodeEnvStr,
       entry: {
         system: [
-          "systemjs/dist/system" + suffix + ".js",
-          "systemjs/dist/extras/named-register" + suffix + ".js",
-          "systemjs/dist/extras/dynamic-import-maps" + suffix + ".js",
-        ],
+          'systemjs/dist/system' + suffix + '.js',
+          'systemjs/dist/extras/named-register' + suffix + '.js',
+          'systemjs/dist/extras/dynamic-import-maps' + suffix + '.js'
+        ]
       },
       output: {
         path: buildDirAbs,
-        filename: "[name].js",
+        filename: '[name].js'
       },
-      devtool: args.production ? false : "inline-source-map",
+      devtool: args.production ? false : 'inline-source-map',
       optimization: {
-        minimize: args.production,
-      },
+        minimize: args.production
+      }
     });
   }
 
@@ -261,28 +261,28 @@ ${args.publicModules.reduce(
       let web = /((server)|(ssr))/.exec(m) === null;
       let externals = args.publicModules.reduce(
         (prev, cur) => (m != cur ? { ...prev, [cur]: cur } : prev),
-        {},
+        {}
       );
-      await build(`📚 ${m} (${web ? "web" : "server"})`, {
+      await build(`📚 ${m} (${web ? 'web' : 'server'})`, {
         mode: nodeEnvStr,
-        target: web ? "web" : "node",
+        target: web ? 'web' : 'node',
         entry: m,
         output: {
           path: buildDirAbs,
-          filename: m + ".js",
-          libraryTarget: "system",
+          filename: m + '.js',
+          libraryTarget: 'system',
           library: {
-            type: "system",
-            name: m,
-          },
+            type: 'system',
+            name: m
+          }
         },
         resolve: {
-          extensions: [".ts", ".tsx", ".js"],
+          extensions: ['.ts', '.tsx', '.js'],
           modules: [
-            resolve(args.rootPath, "src"),
-            join(args.rootPath, "node_modules"),
-            join(process.cwd(), "node_modules"),
-            "node_modules",
+            resolve(args.rootPath, 'src'),
+            join(args.rootPath, 'node_modules'),
+            join(process.cwd(), 'node_modules'),
+            'node_modules'
           ],
           fallback: {
             fs: false,
@@ -293,8 +293,8 @@ ${args.publicModules.reduce(
             http: false,
             https: false,
             stream: false,
-            crypto: false,
-          },
+            crypto: false
+          }
         },
 
         module: {
@@ -303,72 +303,72 @@ ${args.publicModules.reduce(
             // with default imports. This explicitly defines a default import as a wildcard.
             {
               test: /\.(j|t)sx?$/,
-              loader: "string-replace-loader",
+              loader: 'string-replace-loader',
               options: {
                 multiple: [
                   {
                     search: /import\s+React\s+from\s+('|")react('|")/i,
-                    replace: "import * as React from 'react'",
+                    replace: "import * as React from 'react'"
                   },
                   {
                     search:
                       /(import\s+React,\s+){(\s*.*\s*)}\s*(from\s+('|")react('|"))/,
                     replace: (_match, _p1, p2) =>
                       `import * as React from 'react';const {${p2}} = React`,
-                    flags: "g",
-                  },
-                ],
-              },
-            },
-          ],
+                    flags: 'g'
+                  }
+                ]
+              }
+            }
+          ]
         },
-        externalsType: "system",
+        externalsType: 'system',
         externals,
         externalsPresets: {
-          web,
+          web
         },
-        devtool: args.production ? false : "inline-source-map",
+        devtool: args.production ? false : 'inline-source-map',
         plugins: [
           new DefinePlugin({
-            "process.env": {
-              NODE_ENV: JSON.stringify(nodeEnvStr),
-            },
-          }),
+            'process.env': {
+              NODE_ENV: JSON.stringify(nodeEnvStr)
+            }
+          })
         ],
         optimization: {
-          minimize: args.production ? true : false,
-        },
+          minimize: args.production ? true : false
+        }
       });
     }
   }
 
   // ✨ Build main target:
   if (args.input.length > 0) {
-    const relativeInputPath = "./" + args.input;
-    await build("✨ " + mainTitle, {
+    const relativeInputPath = './' + args.input;
+    await build('✨ ' + mainTitle, {
       mode: nodeEnvStr,
       context: args.rootPath,
       entry: {
-        main: relativeInputPath,
+        main: relativeInputPath
       },
       output: {
         path: buildDirAbs,
-        filename: "[name].js",
-        libraryTarget: "system",
-        library: { type: "system", name: libraryName },
+        filename: '[name].js',
+        libraryTarget: 'system',
+        library: { type: 'system', name: libraryName }
       },
       externalsPresets: {
-        web: true,
+        web: true
       },
-      externalsType: "system",
+      externalsType: 'system',
       externals: args.publicModules,
       resolve: {
-        extensions: [".ts", ".tsx", ".js"],
+        extensions: ['.ts', '.tsx', '.js'],
         modules: [
-          resolve(args.rootPath, "src"),
-          join(args.rootPath, "node_modules"),
-          join(process.cwd(), "node_modules"),
-          "node_modules",
+          resolve(args.rootPath, 'src'),
+          join(args.rootPath, 'node_modules'),
+          join(process.cwd(), 'node_modules'),
+          'node_modules'
         ],
         fallback: {
           fs: false,
@@ -380,103 +380,103 @@ ${args.publicModules.reduce(
           https: false,
           stream: false,
           crypto: false,
-          buffer: false,
-        },
+          buffer: false
+        }
       },
       module: {
         rules: [
           {
             test: /\.tsx?$/,
-            loader: "ts-loader",
-            options: tsLoaderOptions,
+            loader: 'ts-loader',
+            options: tsLoaderOptions
           },
           {
             test: /\.s?css$/,
             use: [
               {
-                loader: MiniCssExtractPlugin.loader,
+                loader: MiniCssExtractPlugin.loader
               },
               {
-                loader: "css-loader",
+                loader: 'css-loader'
               },
               {
-                loader: "postcss-loader",
+                loader: 'postcss-loader',
                 options: {
                   postcssOptions: {
                     plugins: [
-                      "postcss-nested",
-                      "postcss-advanced-variables",
-                      "postcss-preset-env",
-                      "autoprefixer",
-                    ],
-                  },
-                },
-              },
-            ],
+                      'postcss-nested',
+                      'postcss-advanced-variables',
+                      'postcss-preset-env',
+                      'autoprefixer'
+                    ]
+                  }
+                }
+              }
+            ]
           },
           {
             test: [
               /\.(woff|ttf|eot|svg)(\?v=[a-z0-9]\.[a-z0-9]\.[a-z0-9])?$/,
-              /\.(ttf|eot|svg)(\?v=[0-9]\.[0-9]\.[0-9])?$/,
+              /\.(ttf|eot|svg)(\?v=[0-9]\.[0-9]\.[0-9])?$/
             ],
-            type: "asset/resource",
+            type: 'asset/resource'
           },
           {
             test: /\.(wgsl|glsl)$/,
-            type: "asset/source",
+            type: 'asset/source'
           },
           {
             test: /\.wasm$/,
 
-            loader: "file-loader",
+            loader: 'file-loader',
             options: {
-              name: "[name].[ext]",
-            },
+              name: '[name].[ext]'
+            }
           },
           {
             test: /\.mdx$/,
             use: [
               {
-                loader: "ts-loader",
-                options: tsLoaderOptions,
+                loader: 'ts-loader',
+                options: tsLoaderOptions
               },
               {
-                loader: "@mdx-js/loader",
+                loader: '@mdx-js/loader',
                 options: {
                   jsx: false,
-                  providerImportSource: "@mdx-js/react",
+                  providerImportSource: '@mdx-js/react',
                   remarkPlugins: [remarkMath, remarkCode, remarkGfm],
-                  rehypePlugins: [rehypeKatex, rehypeSlug],
-                },
-              },
-            ],
-          },
-        ],
+                  rehypePlugins: [rehypeKatex, rehypeSlug]
+                }
+              }
+            ]
+          }
+        ]
       },
       resolveLoader: {
-        modules: ["node_modules", join(process.cwd(), "node_modules")],
-        extensions: [".js", ".json"],
-        mainFields: ["loader", "main"],
+        modules: ['node_modules', join(process.cwd(), 'node_modules')],
+        extensions: ['.js', '.json'],
+        mainFields: ['loader', 'main']
       },
       plugins: [
         new DefinePlugin({
-          "process.env": {
-            NODE_ENV: JSON.stringify(nodeEnvStr),
-          },
+          'process.env': {
+            NODE_ENV: JSON.stringify(nodeEnvStr)
+          }
         }),
         new MiniCssExtractPlugin({
-          filename: "[name].css",
-        }) as any,
+          filename: '[name].css'
+        }) as any
       ],
-      devtool: args.production ? false : "inline-source-map",
+      devtool: args.production ? false : 'inline-source-map',
       optimization: {
         minimize: args.production ? true : false,
         minimizer: [
           // For webpack@5 you can use the `...` syntax to extend existing minimizers (i.e. `terser-webpack-plugin`), uncomment the next line
           `...`,
-          new CssMinimizerPlugin(),
-        ],
-      },
+          new CssMinimizerPlugin()
+        ]
+      }
     });
   }
 

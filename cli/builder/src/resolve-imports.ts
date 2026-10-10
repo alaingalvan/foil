@@ -1,15 +1,15 @@
-import { argv } from "process";
-import { dirname, isAbsolute, join, relative } from "path";
-import { existsSync, readFileSync } from "fs";
-import Find from "find";
+import { argv } from 'process';
+import { dirname, isAbsolute, join, relative } from 'path';
+import { existsSync, readFileSync } from 'fs';
+import Find from 'find';
 const { fileSync } = Find;
-import dependencyTree from "dependency-tree";
+import dependencyTree from 'dependency-tree';
 
 // 📃 Parse Args:
 // resolve-imports <root_path> <file>
 // Output is list of JS/TS import files, eg: ["c:/main.js", ...]
 if (argv.length < 2) {
-  console.error("Missing arguments: resolve-imports <root> <file>");
+  console.error('Missing arguments: resolve-imports <root> <file>');
   process.exit(1);
 }
 const rootPath = argv[argv.length - 2];
@@ -42,11 +42,11 @@ function addDependencies(inputFile: string) {
       let fileNameTest = relative(rootPath, join(filePath, mdxImportFile));
 
       let fileRegex = new RegExp(
-        "(" +
+        '(' +
           fileNameTest +
-          "(\\/|\\\\)index\\.(j|t)sx?$)|(" +
+          '(\\/|\\\\)index\\.(j|t)sx?$)|(' +
           fileNameTest +
-          "\\.(j|t)sx?$)"
+          '\\.(j|t)sx?$)'
       );
 
       let foundMDXImports = fileSync(fileRegex, rootPath);
@@ -61,24 +61,24 @@ function addDependencies(inputFile: string) {
     let dependencies = dependencyTree.toList({
       filename: inputFile,
       directory: rootPath,
-      filter: (path) => path.indexOf("node_modules") === -1,
+      filter: (path) => path.indexOf('node_modules') === -1,
       nodeModulesConfig: {
-        entry: "module",
+        entry: 'module'
       },
       tsConfig: {
         compilerOptions: {
-          target: "es2016",
-          module: "CommonJS",
+          target: 'es2016',
+          module: 'CommonJS',
           isolatedModules: true,
           allowSyntheticDefaultImports: true,
           noImplicitAny: false,
           suppressImplicitAnyIndexErrors: true,
           removeComments: true,
-          jsx: "react",
+          jsx: 'react'
         },
 
-        transpileOnly: true,
-      },
+        transpileOnly: true
+      }
     });
     // Add files to import set.
     dependencies.forEach((file: string) => {
