@@ -1,6 +1,6 @@
 import { createInterface } from 'readline';
-import { buildFoil } from './build/foil';
-import type { Request, Response } from './protocol';
+import { buildFoil } from './builder/foil.ts';
+import type { Request, Response } from './protocol.ts';
 
 // Server mode: one JSON request per stdin line, one JSON response per stdout line.
 export async function serve() {

@@ -1,6 +1,6 @@
 import chalk from 'chalk';
-import { parseArgs } from './args';
-import { buildFoil } from './build/foil';
+import { parseArgs } from './args.ts';
+import { buildFoil } from './builder/foil.ts';
 
 // Fallback mode: parse argv, build one foil, exit.
 export async function runOnce(argv: string[]) {

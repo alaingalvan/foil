@@ -1,4 +1,4 @@
-import type { BuildArgs } from './args';
+import type { BuildArgs } from './args.ts';
 
 // One JSON message per line over stdin/stdout. Mirrored by cli/src/builder/server.rs.
 export type Request =

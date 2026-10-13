@@ -8,23 +8,7 @@ import { exec as execCallback } from 'node:child_process';
 const exec = promisify(execCallback);
 
 async function postBuild() {
-  // 🔎 Find all relative imports in dist/*/*.js files, append .js extension if missing.
   const distPath = join(cwd(), 'dist');
-  const foundJsFiles = fileSync(/\.js$/, distPath);
-  console.log(
-    `🔨 Found ${foundJsFiles.length} files in ${distPath}, fixing relative imports to include .js.\n`
-  );
-
-  const jsFilePromises = foundJsFiles.map(async (foundJsFile) => {
-    const jsFile = (await readFile(foundJsFile)).toString();
-    const updatedContent = jsFile.replaceAll(
-      /(import\s*.*)("|')(\.{1,2}\/.*[^j][^s])("|')/g,
-      '$1$2$3.js$4'
-    );
-    return writeFile(foundJsFile, updatedContent);
-  });
-
-  await Promise.all(jsFilePromises);
 
   // 📄 Copy dist to release folder:
   const releaseTargetPath = resolve(join(cwd(), '..', 'target'));

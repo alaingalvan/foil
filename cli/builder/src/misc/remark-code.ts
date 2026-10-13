@@ -18,11 +18,11 @@ import hljs from "highlight.js";
 const { getLanguage, highlight, registerLanguage, registerAliases } = hljs;
 import sanitizeHtml from "sanitize-html";
 
-import cpp from "./cpp";
-import glsl from "./glsl";
-import hlsl from "./hlsl";
-import msl from "./msl";
-import wgsl from "./wgsl";
+import cpp from "./cpp.ts";
+import glsl from "./glsl.ts";
+import hlsl from "./hlsl.ts";
+import msl from "./msl.ts";
+import wgsl from "./wgsl.ts";
 
 registerLanguage("cpp", cpp);
 registerLanguage("glsl", glsl);
