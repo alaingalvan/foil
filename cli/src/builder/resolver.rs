@@ -1,9 +1,9 @@
 use super::metadata::FoilMetadata;
 use super::nodejs::find_all_imports;
 use super::package_schema::{NodeAuthor, NodePackage, StringMap};
-use super::static_assets::{build_static_assets, FoilFile, StaticAsset};
+use super::static_assets::{FoilFile, StaticAsset, build_static_assets};
 use crate::Result;
-use async_std::task::{spawn, JoinHandle};
+use async_std::task::{JoinHandle, spawn};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
 use std::fs::File;
@@ -131,10 +131,10 @@ pub async fn resolve_foil(cur_path_package: PathBuf) -> JoinHandle<Option<(Foil,
                     Ok(resolved_foil) => {
                         return Some((resolved_foil, foil_metadata));
                     }
-                    Err(er) => println!("Skipping {}: {}", cur_path_package.display(), er),
+                    Err(er) => println!("Skipping {}\n{}\n", cur_path_package.display(), er),
                 };
             }
-            Err(er) => println!("Skipping {}: {}", cur_path_package.display(), er),
+            Err(er) => println!("Skipping {}\n{}\n", cur_path_package.display(), er),
         };
         None
     })
@@ -340,7 +340,7 @@ pub fn read_foil_package(file_path: &PathBuf) -> Result<NodePackage> {
         Err(e) => {
             return Err(Box::new(Error::new(
                 e.kind(),
-                format!("Failed to open '{}': {}", file_path.display(), e),
+                format!("Failed to open:\n{}\n{}", file_path.display(), e),
             )));
         }
     };
@@ -351,11 +351,7 @@ pub fn read_foil_package(file_path: &PathBuf) -> Result<NodePackage> {
             // Missing "foil" object is the most common cause of this error.
             return Err(Box::new(Error::new(
                 ErrorKind::InvalidData,
-                format!(
-                    "Failed to parse '{}': {}. Ensure it has a \"foil\" object, e.g. \"foil\": {{}}.",
-                    file_path.display(),
-                    er
-                ),
+                format!("Failed to parse: {}", er),
             )));
         }
     };
