@@ -7,7 +7,7 @@ use async_std::task::{spawn, JoinHandle};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Error, ErrorKind};
 use std::path::PathBuf;
 use std::str::FromStr;
 use walkdir::{DirEntry, WalkDir};
@@ -131,10 +131,10 @@ pub async fn resolve_foil(cur_path_package: PathBuf) -> JoinHandle<Option<(Foil,
                     Ok(resolved_foil) => {
                         return Some((resolved_foil, foil_metadata));
                     }
-                    Err(_er) => (),
+                    Err(er) => println!("Skipping {}: {}", cur_path_package.display(), er),
                 };
             }
-            Err(_er) => (),
+            Err(er) => println!("Skipping {}: {}", cur_path_package.display(), er),
         };
         None
     })
@@ -193,6 +193,17 @@ fn process_foil_project(
     path: &PathBuf,
     metadata: &FoilMetadata,
 ) -> Result<Foil> {
+    // Permalinks must be absolute to match URL routing and database lookups.
+    if !package.foil.permalink.starts_with('/') {
+        return Err(Box::new(Error::new(
+            ErrorKind::InvalidInput,
+            format!(
+                "Permalink '{}' must be absolute, start with '/'.",
+                package.foil.permalink
+            ),
+        )));
+    }
+
     // 🚢 Resolve source file imports, spawning Node only if a recorded file changed:
     let source_files = match metadata.unchanged_source_files() {
         Some(files) => files,
@@ -327,22 +338,24 @@ pub fn read_foil_package(file_path: &PathBuf) -> Result<NodePackage> {
     let file = match File::open(&file_path) {
         Ok(v) => v,
         Err(e) => {
-            println!("{:?}", e);
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Failed to open file path to 'package.json'.",
+            return Err(Box::new(Error::new(
+                e.kind(),
+                format!("Failed to open '{}': {}", file_path.display(), e),
             )));
         }
     };
     let reader = BufReader::new(file);
     let data: NodePackage = match serde_json::from_reader(reader) {
         Ok(v) => v,
-        Err(_er) => {
-            // TODO: We should probably leave this to some verbose mode...
-            println!("Failed to parse package.json, skipping. {}", _er.to_string());
-            return Err(Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Failed to parse package.json, skipping.",
+        Err(er) => {
+            // Missing "foil" object is the most common cause of this error.
+            return Err(Box::new(Error::new(
+                ErrorKind::InvalidData,
+                format!(
+                    "Failed to parse '{}': {}. Ensure it has a \"foil\" object, e.g. \"foil\": {{}}.",
+                    file_path.display(),
+                    er
+                ),
             )));
         }
     };
