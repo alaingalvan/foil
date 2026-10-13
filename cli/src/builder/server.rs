@@ -107,6 +107,11 @@ impl BuilderServer {
         })
     }
 
+    /// False once the server's stdout has closed, meaning the process exited.
+    pub fn is_running(&self) -> bool {
+        self.waiters.lock().map(|w| w.is_some()).unwrap_or(false)
+    }
+
     /// Send a `build` request. `payload` mirrors the one-shot CLI args in camelCase.
     pub fn build(&self, title: &str, payload: Value) -> Result<PendingBuild> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);

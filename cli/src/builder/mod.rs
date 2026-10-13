@@ -23,6 +23,7 @@ use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use server::{BuilderServer, PendingBuild};
+use sqlx::{Pool, Postgres};
 use std::time::Instant;
 
 /// Foils whose metadata says a source, runtime, or public module changed.
@@ -40,18 +41,68 @@ pub fn changed_foils(resolved: Vec<(Foil, FoilMetadata)>, build_mode: &BuildMode
 }
 
 //=====================================================================================================================
-/// Process the current working directory for Foil projects.
-pub async fn build(build_mode: BuildMode) -> Result<()> {
-    // `spawn` still polls on async-std's 1 MiB worker stacks. A dedicated thread
-    // gets its own runtime, so the sqlx future is polled on this larger stack.
-    crate::misc::run_on_sql_stack("foil-build", move || {
-        async_std::task::block_on(build_on_thread(build_mode))
-    })
+type Session = (Pool<Postgres>, BuilderServer);
+
+/// Database pool and builder server, kept alive across rebuilds.
+pub struct BuildSession {
+    build_mode: BuildMode,
+    state: Option<Session>,
 }
 
-async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
+impl BuildSession {
+    pub fn new(build_mode: BuildMode) -> Self {
+        Self {
+            build_mode,
+            state: None,
+        }
+    }
+
+    /// Process the current working directory for Foil projects.
+    pub async fn build(&mut self) -> Result<()> {
+        let build_mode = self.build_mode.clone();
+        let state = self.state.take();
+        // `spawn` still polls on async-std's 1 MiB worker stacks. A dedicated thread
+        // gets its own runtime, so the sqlx future is polled on this larger stack.
+        let (state, result) = crate::misc::run_on_sql_stack("foil-build", move || {
+            Ok(async_std::task::block_on(build_on_thread(build_mode, state)))
+        })?;
+        self.state = state;
+        result
+    }
+}
+
+/// Process the current working directory once, without keeping anything alive.
+pub async fn build(build_mode: BuildMode) -> Result<()> {
+    BuildSession::new(build_mode).build().await
+}
+
+async fn build_on_thread(
+    build_mode: BuildMode,
+    state: Option<Session>,
+) -> (Option<Session>, Result<()>) {
+    let session = match state {
+        Some(session) if session.1.is_running() => session,
+        _ => match open_session(&build_mode).await {
+            Ok(session) => session,
+            Err(e) => return (None, Err(e)),
+        },
+    };
+    let result = run_build(&build_mode, &session.0, &session.1).await;
+    (Some(session), result)
+}
+
+async fn open_session(build_mode: &BuildMode) -> Result<Session> {
     // 📚 Configure database...
     let pool = connect_db().await?;
+    let server = BuilderServer::start(build_mode)?;
+    Ok((pool, server))
+}
+
+async fn run_build(
+    build_mode: &BuildMode,
+    pool: &Pool<Postgres>,
+    builder_server: &BuilderServer,
+) -> Result<()> {
     let cwd = env::current_dir().unwrap_or_default();
 
     // ⏳ Start build benchmark:
@@ -73,8 +124,6 @@ async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
 
     let mut update_futures = vec![];
     let mut write_futures = vec![];
-    // Dropped on every exit path, which shuts the server down.
-    let builder_server = BuilderServer::start(&build_mode)?;
     let mut build_children: Vec<PendingBuild> = vec![];
     let mut public_module_cache: HashMap<String, Vec<String>> = HashMap::new();
     let root_foil_permalink = "/".to_string();
@@ -109,7 +158,7 @@ async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
                             "SELECT id, public_modules FROM posts WHERE permalink = $1",
                         )
                         .bind(&root_foil_permalink)
-                        .fetch_one(&pool)
+                        .fetch_one(pool)
                         .await
                         .unwrap_or((-1, vec![]));
                         public_module_cache.insert(root_foil_permalink.clone(), found.1);
@@ -129,7 +178,7 @@ async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
                     build_mode.clone(),
                     &resolved_foil,
                     foil_changed,
-                    &builder_server,
+                    builder_server,
                 )?;
                 build_children.push(child);
             }

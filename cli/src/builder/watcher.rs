@@ -1,7 +1,7 @@
 use super::build_mode::BuildMode;
 use super::metadata::FoilMetadata;
 use super::resolver::Foil;
-use super::{build, changed_foils, resolve_foils};
+use super::{BuildSession, changed_foils, resolve_foils};
 
 use crate::error::Result;
 use crate::server::{self, ServerChildren};
@@ -30,13 +30,14 @@ pub async fn watch(build_mode: BuildMode) -> Result<()> {
     let mut state = WatcherState::Initial;
     let mut children: Option<ServerChildren> = None;
     let mut watched: Vec<WatchedFile> = Vec::new();
+    let mut session = BuildSession::new(build_mode.clone());
 
     loop {
         match state {
             WatcherState::Initial => {
                 let start_foils = resolve_changed(&cwd, &build_mode).await?;
                 if !start_foils.is_empty() {
-                    build(build_mode.clone()).await?;
+                    session.build().await?;
                 }
                 children = start_server(children, &build_mode).await?;
                 println!("\n👀 · Watching for changes... · \n");
@@ -55,7 +56,7 @@ pub async fn watch(build_mode: BuildMode) -> Result<()> {
                 }
             }
             WatcherState::Processing => {
-                if let Err(err) = build(build_mode.clone()).await {
+                if let Err(err) = session.build().await {
                     println!("\n❌ Build failed, server renderer left running.\n{}", err);
                 } else if let Err(err) = restart_renderer(&mut children, &build_mode).await {
                     println!("\n❌ Failed to restart server renderer.\n{}", err);
