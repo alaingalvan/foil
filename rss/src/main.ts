@@ -38,13 +38,7 @@ async function generate(): Promise<void> {
   console.log(`Wrote ${output}`);
 }
 
-const command = process.argv[2];
-if (command !== "generate") {
-  console.error("Usage: foil-rss generate");
+generate().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
-} else {
-  generate().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
-}
+});
