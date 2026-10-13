@@ -18,7 +18,7 @@ async function postBuild() {
   const jsFilePromises = foundJsFiles.map(async (foundJsFile) => {
     const jsFile = (await readFile(foundJsFile)).toString();
     const updatedContent = jsFile.replaceAll(
-      /(import\s*.*)("|')(\.\/.*[^j][^s])("|')/g,
+      /(import\s*.*)("|')(\.{1,2}\/.*[^j][^s])("|')/g,
       '$1$2$3.js$4'
     );
     return writeFile(foundJsFile, updatedContent);

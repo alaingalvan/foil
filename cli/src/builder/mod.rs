@@ -5,6 +5,7 @@ mod database;
 mod metadata;
 mod nodejs;
 mod resolver;
+mod server;
 mod static_assets;
 mod watcher;
 
@@ -21,7 +22,7 @@ use resolver::{Foil, resolve_foils};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
-use std::process::Child;
+use server::{BuilderServer, PendingBuild};
 use std::time::Instant;
 
 /// Foils whose metadata says a source, runtime, or public module changed.
@@ -72,7 +73,9 @@ async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
 
     let mut update_futures = vec![];
     let mut write_futures = vec![];
-    let mut build_children: Vec<Child> = vec![];
+    // Dropped on every exit path, which shuts the server down.
+    let builder_server = BuilderServer::start(&build_mode)?;
+    let mut build_children: Vec<PendingBuild> = vec![];
     let mut public_module_cache: HashMap<String, Vec<String>> = HashMap::new();
     let root_foil_permalink = "/".to_string();
     for (i, (resolved_foil, foil_metadata)) in resolved_foils.iter_mut().enumerate() {
@@ -122,7 +125,12 @@ async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
                     }
                 }
                 // Build project.
-                let child = compile_foil_main(build_mode.clone(), &resolved_foil, foil_changed)?;
+                let child = compile_foil_main(
+                    build_mode.clone(),
+                    &resolved_foil,
+                    foil_changed,
+                    &builder_server,
+                )?;
                 build_children.push(child);
             }
 
@@ -144,8 +152,15 @@ async fn build_on_thread(build_mode: BuildMode) -> Result<()> {
     futures::future::join_all(update_futures).await;
     futures::future::join_all(write_futures).await;
 
-    for mut child in build_children {
-        child.wait().expect("Failed to run Foil Builder...");
+    let mut failed = None;
+    for pending in build_children {
+        if let Err(e) = pending.wait() {
+            println!("\n❌ {}", e);
+            failed = Some(e);
+        }
+    }
+    if let Some(e) = failed {
+        return Err(e);
     }
     let elapsed = now.elapsed();
     println!("⏲️ Build time: {:.2?}", elapsed);

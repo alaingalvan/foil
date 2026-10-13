@@ -2,11 +2,12 @@ use chrono::{DateTime, Utc};
 
 use super::get_foil_builder_path;
 use super::metadata::FoilMetadataStatus;
+use super::server::{BuilderServer, PendingBuild};
 use super::resolver::Foil;
 use super::static_assets::FoilFile;
 use crate::{BuildMode, Result};
 use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 
 //=====================================================================================================================
 // NPM is somewhat buggy at times, and requires the extension on windows.
@@ -118,7 +119,8 @@ pub fn compile_foil_main(
     mode: BuildMode,
     resolved_foil: &Foil,
     foil_changed: FoilMetadataStatus,
-) -> Result<Child> {
+    server: &BuilderServer,
+) -> Result<PendingBuild> {
     // ⤵️ Install all dependencies for this project if they don't exist.
     let _ci = if !needs_install(&resolved_foil.root_path) {
         Ok(())
@@ -151,8 +153,6 @@ pub fn compile_foil_main(
 
     // 🔨 Build foil project using node.js and webpack.
     // This builds the output, and optionally the SystemJS runtime, import map, and vendor modules.
-    // The foil builder exists next to the current executable:
-    let foil_builder_path = get_foil_builder_path();
     let root_path_str = resolved_foil
         .root_path
         .to_str()
@@ -168,55 +168,18 @@ pub fn compile_foil_main(
         .replace("\\", "/")
         .replace(&root_path_str, "");
 
-    let mut compile = Command::new("node");
-    compile.current_dir(&foil_builder_path).args([
-        "--experimental-specifier-resolution=node",
-        "--experimental-modules",
-        "--experimental-import-meta-resolve",
-        "--no-warnings",
-        "dist/src/foil-builder.js",
-        "--name",
-        &resolved_foil.name,
-        "--main-title",
-        &resolved_foil.title,
-        "--root-path",
-        &root_path_str,
-        "--output",
-        &output_path_str,
-    ]);
-
-    if foil_changed.files_changed {
-        compile.arg("--input");
-        compile.arg(&resolved_foil.main);
-    }
-    if resolved_foil.frontend {
-        if foil_changed.runtime_changed {
-            compile.arg("--system");
-        }
-        // Output input map
-        if foil_changed.public_modules_changed {
-            compile.arg("--input-map");
-            compile.arg("--vendor");
-        }
-    }
-    match mode {
-        BuildMode::Release => {
-            compile.arg("--production");
-            compile.env("NODE_ENV", "production");
-        }
-        BuildMode::Development => {
-            compile.env("NODE_ENV", "development");
-        }
-    };
-
-    compile.arg("--public-modules");
-    compile.args(&resolved_foil.public_modules);
-
-    let output = compile
-        .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .spawn()
-        .unwrap();
-
-    Ok(output)
+    let frontend = resolved_foil.frontend;
+    let payload = serde_json::json!({
+        "name": resolved_foil.name,
+        "mainTitle": resolved_foil.title,
+        "rootPath": root_path_str,
+        "output": output_path_str,
+        "input": if foil_changed.files_changed { resolved_foil.main.as_str() } else { "" },
+        "system": frontend && foil_changed.runtime_changed,
+        "inputMap": frontend && foil_changed.public_modules_changed,
+        "vendor": frontend && foil_changed.public_modules_changed,
+        "publicModules": resolved_foil.public_modules,
+        "production": matches!(mode, BuildMode::Release),
+    });
+    server.build(&resolved_foil.title, payload)
 }

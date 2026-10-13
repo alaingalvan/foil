@@ -11,8 +11,8 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "lib": ["dom", "es2021"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "noEmitHelpers": false,
     "noImplicitAny": false,
     "outDir": "dist",
@@ -20,7 +20,8 @@
     "resolveJsonModule": true,
     "sourceMap": true,
     "strictNullChecks": false,
-    "target": "es2021"
+    "target": "es2021",
+    "types": ["node"]
   },
   "exclude": ["node_modules"],
   "include": ["./**/*.ts", "./**/*.tsx"]
