@@ -47,7 +47,7 @@
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
     "tsx": "^4.23.15",
-    "typescript": "7.0.2"
+    "typescript": "6.0.3"
   },
   "peerDependencies": {
     "@mdx-js/react": ">=2.3.0",
