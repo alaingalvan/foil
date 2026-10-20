@@ -46,7 +46,7 @@ function createFetchRequest(req) {
   let init = {
     method: req.method,
     headers,
-    signal: controller.signal,
+    signal: controller.signal
   };
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     init.body = '{}';
@@ -54,9 +54,62 @@ function createFetchRequest(req) {
   return new Request(url.href, init);
 }
 // ====================================================================================================================
+// 🔥 Hot Reloading
+const CLIENT_RELOAD_PATH = '/__foil/reload';
+const clients = new Set();
+
+function liveReload(request, response) {
+  response.setHeader('Content-Type', 'text/event-stream');
+  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader('Connection', 'keep-alive');
+  response.flushHeaders();
+
+  clients.add(response);
+  request.on('close', () => clients.delete(response));
+}
+
+// ====================================================================================================================
+// 🐛 Browser error reports never reach node, so the page reports them here with a plain GET the backend already proxies.
+const CLIENT_ERROR_PATH = '/__foil/client-error';
+
+function logClientError(request, response) {
+  const params = new URL(request.url, 'http://localhost').searchParams;
+  // Caps size and strips control characters so a stranger can't flood or forge log lines.
+  const clean = (value, max) =>
+    String(value ?? '')
+      .slice(0, max)
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '');
+  const kind = clean(params.get('kind'), 20);
+  console.error(
+    'Foil Renderer Error: %s in %s\n%s',
+    kind.charAt(0).toUpperCase() + kind.slice(1),
+    clean(params.get('url'), 200),
+    clean(params.get('message'), 4000)
+  );
+  response.writeHead(204);
+  response.end();
+}
+
+// Without this, a failed render leaves the request hanging and logs nothing useful.
+function reportError(request, error, response) {
+  console.error(
+    'Foil Renderer Error: Server render in %s\n%s',
+    request.url,
+    error?.stack ?? error
+  );
+  if (!response.headersSent) {
+    response.writeHead(500, { 'content-type': 'text/plain' });
+  }
+  response.end('Internal Server Error');
+}
+
+// ====================================================================================================================
 // 🎨 Handle all server-side rendering of this foil application.
 const foilRequestHandler = async (request, response) => {
   try {
+    if (request.url?.startsWith(CLIENT_RELOAD_PATH)) {
+      return liveReload(request, response);
+    }
     if (request.url?.startsWith(CLIENT_ERROR_PATH)) {
       return logClientError(request, response);
     }
@@ -75,6 +128,7 @@ const foilRequestHandler = async (request, response) => {
     await getDataFromTree(node);
     const bootstrapScriptContent = `
   window.__APOLLO_STATE__ = ${JSON.stringify(client.extract())};
+  // Runtime Error Tracking
   function foilReport(kind, error, info) {
     try {
       var text = (error && error.stack) || String(error);
@@ -97,6 +151,25 @@ const foilRequestHandler = async (request, response) => {
   window.addEventListener('unhandledrejection', function (e) {
     foilReport('promise', e.reason);
   });
+
+  // Hot Reloading
+  const connect = () => {
+    const source = new EventSource('${CLIENT_RELOAD_PATH}')
+
+    source.onerror = () => {
+      source.close()
+      const poll = setInterval(async () => {
+        try {
+          if ((await fetch('${CLIENT_RELOAD_PATH}')).ok) {
+            clearInterval(poll)
+            window.location.reload()
+          }
+        } catch {}
+      }, 500)
+    }
+  }
+  connect();
+
   async function main() {
     const jsxRuntime = await System.import('react/jsx-runtime');
     const reactDom = await System.import('react-dom/client');
@@ -137,48 +210,14 @@ const foilRequestHandler = async (request, response) => {
         console.error(
           'Foil Renderer Error: Server render in %s\n%s',
           request.url,
-          error?.stack ?? error,
+          error?.stack ?? error
         );
-      },
+      }
     });
   } catch (error) {
     reportError(request, error, response);
   }
 };
-
-// Browser errors never reach node, so the page reports them here with a plain GET the backend already proxies.
-const CLIENT_ERROR_PATH = '/__foil/client-error';
-
-function logClientError(request, response) {
-  const params = new URL(request.url, 'http://localhost').searchParams;
-  // Caps size and strips control characters so a stranger can't flood or forge log lines.
-  const clean = (value, max) =>
-    String(value ?? '')
-      .slice(0, max)
-      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '');
-  const kind = clean(params.get('kind'), 20);
-  console.error(
-    'Foil Renderer Error: %s in %s\n%s',
-    kind.charAt(0).toUpperCase() + kind.slice(1),
-    clean(params.get('url'), 200),
-    clean(params.get('message'), 4000),
-  );
-  response.writeHead(204);
-  response.end();
-}
-
-// Without this, a failed render leaves the request hanging and logs nothing useful.
-function reportError(request, error, response) {
-  console.error(
-    'Foil Renderer Error: Server render in %s\n%s',
-    request.url,
-    error?.stack ?? error,
-  );
-  if (!response.headersSent) {
-    response.writeHead(500, { 'content-type': 'text/plain' });
-  }
-  response.end('Internal Server Error');
-}
 
 // ====================================================================================================================
 const server = createServer(foilRequestHandler);
