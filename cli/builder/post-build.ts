@@ -1,7 +1,5 @@
 import { readFile, writeFile, mkdir, cp } from 'node:fs/promises';
 import { join, resolve } from 'path';
-import Find from 'find';
-const { fileSync } = Find;
 import { cwd } from 'process';
 import { promisify } from 'node:util';
 import { exec as execCallback } from 'node:child_process';

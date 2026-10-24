@@ -45,3 +45,5 @@ target
 .vscode
 .markdownlint.json
 foil-meta.json
+# Import resolver fixtures
+!cli/test-assets/**/*.js

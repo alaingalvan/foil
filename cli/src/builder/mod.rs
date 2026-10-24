@@ -2,6 +2,7 @@ pub mod build_mode;
 pub mod package_schema;
 
 mod database;
+mod imports;
 mod metadata;
 mod nodejs;
 mod resolver;

@@ -1,0 +1,16 @@
+import citations from './citations';
+import { createCite } from 'alain-xyz';
+import Chart from './widgets/chart';
+import {
+  a,
+  b
+} from './widgets/multi';
+export const { Cite } = createCite(citations);
+
+An intro that mentions import './in-prose' mid-sentence.
+
+![Espresso scale](/blog/assets/espresso-sizes.svg)
+
+```ts
+import fake from './in-fence';
+```
