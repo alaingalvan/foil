@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::misc::{get_db_url, DATABASE_URL};
+use crate::misc::{DATABASE_URL, get_db_url};
 use std::env;
 use std::fs::OpenOptions;
 use std::path::PathBuf;

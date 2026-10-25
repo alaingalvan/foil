@@ -101,16 +101,17 @@ impl Loader<PostId> for FoilLoader {
 
     async fn load(&self, keys: &[PostId]) -> Result<HashMap<PostId, Self::Value>, Self::Error> {
         let ids: Vec<i32> = keys.iter().map(|key| key.0).collect();
-        let sql_postmap: HashMap<PostId, SQLPost> = sqlx::query_as(include_str!("sql/post_load.sql"))
-            .bind(&ids)
-            .fetch(&self.pool)
-            .map_err(|x| {
-                error!("Query Failed: {}", x.to_string());
-            })
-            .map_ok(|user: SQLPost| (PostId(user.id), user))
-            .try_collect()
-            .await
-            .unwrap_or(HashMap::new());
+        let sql_postmap: HashMap<PostId, SQLPost> =
+            sqlx::query_as(include_str!("sql/post_load.sql"))
+                .bind(&ids)
+                .fetch(&self.pool)
+                .map_err(|x| {
+                    error!("Query Failed: {}", x.to_string());
+                })
+                .map_ok(|user: SQLPost| (PostId(user.id), user))
+                .try_collect()
+                .await
+                .unwrap_or(HashMap::new());
 
         let mut m: HashMap<PostId, Self::Value> = HashMap::new();
         for sql_post in sql_postmap {

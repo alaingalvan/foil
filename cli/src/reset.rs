@@ -18,9 +18,7 @@ async fn clear_post_metadata(pool: &Pool<Postgres>) -> Result<()> {
     let roots: Vec<String> = match fetched {
         Ok(roots) => roots,
         Err(e)
-            if e.as_database_error()
-                .and_then(|db| db.code())
-                .as_deref()
+            if e.as_database_error().and_then(|db| db.code()).as_deref()
                 == Some(UNDEFINED_TABLE) =>
         {
             println!("No posts table found, skipping metadata cleanup.");
@@ -69,4 +67,3 @@ pub async fn reset() -> Result<()> {
     // gets its own runtime, so the sqlx future is polled on this larger stack.
     run_on_sql_stack("foil-reset", || task::block_on(reset_on_thread()))
 }
-

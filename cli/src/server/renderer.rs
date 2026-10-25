@@ -75,10 +75,7 @@ pub(super) async fn spawn_renderer(
     let mut backend_renderer_child = process::Command::new("node")
         .current_dir(cwd)
         .env("NODE_PATH", node_path_str)
-        .args([
-            warning_flag,
-            &server_source_file_abs_str,
-        ])
+        .args([warning_flag, &server_source_file_abs_str])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()

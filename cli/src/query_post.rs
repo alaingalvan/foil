@@ -1,7 +1,7 @@
 use crate::builder::package_schema::NodeAuthor;
 use chrono::{DateTime, Utc};
 use serde_derive::Serialize;
-use sqlx::{postgres::Postgres, Pool};
+use sqlx::{Pool, postgres::Postgres};
 #[derive(Debug, Serialize, Clone, sqlx::Type)]
 #[sqlx(type_name = "_author")]
 pub struct Authors(pub Vec<NodeAuthor>);

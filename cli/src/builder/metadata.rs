@@ -3,7 +3,7 @@ use super::package_schema::StringMap;
 use super::resolver::Foil;
 use super::static_assets::FoilFile;
 use crate::BuildMode;
-use async_std::task::{spawn, JoinHandle};
+use async_std::task::{JoinHandle, spawn};
 use serde_derive::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::{fs, io::Read};

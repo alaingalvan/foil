@@ -1,13 +1,13 @@
 mod posts;
 
 use async_graphql::dataloader::DataLoader;
-use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
+use async_graphql::http::{GraphQLPlaygroundConfig, playground_source};
 use async_graphql::{EmptyMutation, EmptySubscription, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Extension,
-    http::header::LOCATION,
     http::StatusCode,
+    http::header::LOCATION,
     response::{Html, IntoResponse, Response},
 };
 use axum_macros::debug_handler;
@@ -33,7 +33,10 @@ pub fn graphql_schema(postgres_pool: &Pool<Postgres>) -> FoilSchema {
 
 // 📊 Main GraphQL Handler endpoint.
 #[debug_handler]
-pub async fn graphql_handler(schema: Extension<FoilSchema>, req: GraphQLRequest) -> GraphQLResponse {
+pub async fn graphql_handler(
+    schema: Extension<FoilSchema>,
+    req: GraphQLRequest,
+) -> GraphQLResponse {
     let gql_inner = req.into_inner();
     let gql_response = schema.execute(gql_inner).await;
     gql_response.into()

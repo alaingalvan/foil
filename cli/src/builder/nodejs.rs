@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 
 use super::imports::resolve_imports;
 use super::metadata::FoilMetadataStatus;
-use super::server::{BuilderServer, PendingBuild};
 use super::resolver::Foil;
+use super::server::{BuilderServer, PendingBuild};
 use super::static_assets::FoilFile;
 use crate::{BuildMode, Result};
 use std::path::PathBuf;

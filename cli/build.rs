@@ -4,20 +4,20 @@ use std::process::Command;
 fn run_command(name: &str, args: &[&str]) -> String {
     let output = match Command::new(name).args(args).output() {
         Ok(output) => output,
-        Err(_) => panic!("Failed to run '{name:?} {:?}'. Is '{name}' installed and in your PATH?", name),
+        Err(_) => panic!(
+            "Failed to run '{name:?} {:?}'. Is '{name}' installed and in your PATH?",
+            name
+        ),
     };
 
     if !output.status.success() {
         panic!(
             "'{name} {:?}' command failed with status {}",
-            args,
-            output.status
+            args, output.status
         );
     }
 
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_string()
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
 fn main() {

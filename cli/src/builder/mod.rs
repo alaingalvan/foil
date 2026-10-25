@@ -20,11 +20,11 @@ use database::{clean_database, update_foil_db};
 use metadata::{FoilMetadata, write_foil_metadata};
 use nodejs::compile_foil_main;
 use resolver::{Foil, resolve_foils};
+use server::{BuilderServer, PendingBuild};
+use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
-use server::{BuilderServer, PendingBuild};
-use sqlx::{Pool, Postgres};
 use std::time::Instant;
 
 /// Foils whose metadata says a source, runtime, or public module changed.
@@ -65,7 +65,9 @@ impl BuildSession {
         // `spawn` still polls on async-std's 1 MiB worker stacks. A dedicated thread
         // gets its own runtime, so the sqlx future is polled on this larger stack.
         let (state, result) = crate::misc::run_on_sql_stack("foil-build", move || {
-            Ok(async_std::task::block_on(build_on_thread(build_mode, state)))
+            Ok(async_std::task::block_on(build_on_thread(
+                build_mode, state,
+            )))
         })?;
         self.state = state;
         result

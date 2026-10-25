@@ -33,7 +33,9 @@ pub fn get_db_url() -> String {
     let db_url = match env::var(DATABASE_URL) {
         Ok(val) => val,
         Err(_e) => {
-            println!("Couldn't find Foil database URL environment variable FOIL_DATABASE_URL.\nDefaulting to postgres://localhost/foil");
+            println!(
+                "Couldn't find Foil database URL environment variable FOIL_DATABASE_URL.\nDefaulting to postgres://localhost/foil"
+            );
             "postgres://localhost/foil".to_string()
         }
     };

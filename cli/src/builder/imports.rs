@@ -448,7 +448,10 @@ mod tests {
 
     #[test]
     fn cycles_terminate() {
-        assert_eq!(resolved("cycle/a.ts"), sorted(&["cycle/a.ts", "cycle/b.ts"]));
+        assert_eq!(
+            resolved("cycle/a.ts"),
+            sorted(&["cycle/a.ts", "cycle/b.ts"])
+        );
     }
 
     #[test]
@@ -494,7 +497,9 @@ mod tests {
         "#;
         assert_eq!(
             scan_specifiers(src),
-            ["./a", "./b", "./c", "./d", "./e", "./f", "./g", "./h", "./i", "./j"]
+            [
+                "./a", "./b", "./c", "./d", "./e", "./f", "./g", "./h", "./i", "./j"
+            ]
         );
     }
 

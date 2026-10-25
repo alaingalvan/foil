@@ -116,7 +116,12 @@ impl BuilderServer {
     pub fn build(&self, title: &str, payload: Value) -> Result<PendingBuild> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = channel();
-        match self.waiters.lock().map_err(|_| "builder lock poisoned")?.as_mut() {
+        match self
+            .waiters
+            .lock()
+            .map_err(|_| "builder lock poisoned")?
+            .as_mut()
+        {
             Some(map) => map.insert(id, tx),
             None => return Err("Builder server is not running".into()),
         };
