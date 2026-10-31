@@ -43,7 +43,22 @@ function author(post: Post): string {
   return element("author", person.email + name);
 }
 
-export function buildFeed(root: Post, items: FeedItem[], origin: string): string {
+export interface PageLinks {
+  self: string;
+  first: string;
+  previous?: string;
+  next?: string;
+}
+
+function pageLinks(links: PageLinks | undefined, origin: string): string {
+  if (!links) return "";
+  return (["self", "first", "previous", "next"] as const)
+    .filter((rel) => links[rel])
+    .map((rel) => `<atom:link rel="${rel}" type="application/rss+xml" href="${escapeXml(absoluteUrl(links[rel]!, origin))}"/>`)
+    .join("\n");
+}
+
+export function buildFeed(root: Post, items: FeedItem[], origin: string, links?: PageLinks): string {
   const link = absoluteUrl(root.authors[0]?.url || "/", origin) || origin;
   const categories = root.keywords.map((tag) => element("category", tag)).join("");
   const itemXml = items
@@ -67,9 +82,10 @@ ${body}
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
 ${element("title", root.title)}
+${pageLinks(links, origin)}
 ${element("link", link)}
 ${element("description", root.description)}
 ${element("language", "en")}

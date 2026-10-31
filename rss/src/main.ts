@@ -1,12 +1,13 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { loadFeedPosts } from "./db.js";
 import { buildFeed } from "./feed.js";
+import { paginate, parsePageSize } from "./pages.js";
 import { renderPost } from "./render.js";
 import { absolutizeHtml, siteOrigin } from "./urls.js";
 
-async function generate(): Promise<void> {
+async function generate(pageSize: number): Promise<void> {
   const { root, items } = await loadFeedPosts();
   const origin = siteOrigin(root.authors[0]?.url || "");
   if (!origin) {
@@ -29,16 +30,22 @@ async function generate(): Promise<void> {
     });
   }
 
-  const xml = buildFeed(root, rendered, origin);
+  const pages = paginate(rendered, pageSize);
 
+  // Page numbers shift as posts are published, so drop old pages first.
+  const rssDir = join(root.outputPath, "rss");
   await mkdir(root.outputPath, { recursive: true });
-  const output = join(root.outputPath, "rss.xml");
-  await writeFile(output, xml, "utf8");
+  await rm(rssDir, { recursive: true, force: true });
+  await mkdir(rssDir, { recursive: true });
 
-  console.log(`Wrote ${output}`);
+  for (const page of pages) {
+    const output = join(root.outputPath, page.file);
+    await writeFile(output, buildFeed(root, page.items, origin, page.links), "utf8");
+    console.log(`Wrote ${output}`);
+  }
 }
 
-generate().catch((error: unknown) => {
+generate(parsePageSize(process.argv.slice(2))).catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
 });

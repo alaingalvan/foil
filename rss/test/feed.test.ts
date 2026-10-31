@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { buildFeed } from "../src/feed.ts";
 import { globToRegex } from "../src/glob.ts";
+import { DEFAULT_PAGE_SIZE, paginate, parsePageSize } from "../src/pages.ts";
 import type { Post } from "../src/types.ts";
 import { absoluteUrl, absolutizeHtml, siteOrigin } from "../src/urls.ts";
 import { cdata, rfc822 } from "../src/xml.ts";
@@ -46,6 +47,36 @@ describe("urls", () => {
     const html = absolutizeHtml('<img src="/covers/a.png"><a href="mailto:ada@example.com">mail</a>', "https://alain.xyz");
     assert.match(html, /src="https:\/\/alain\.xyz\/covers\/a\.png"/);
     assert.match(html, /href="mailto:ada@example.com"/);
+  });
+});
+
+describe("pagination", () => {
+  const items = Array.from({ length: 25 }, (_, i) => i);
+
+  it("splits newest-first into rss.xml and rss/N.xml", () => {
+    const pages = paginate(items, DEFAULT_PAGE_SIZE);
+    assert.deepEqual(pages.map((p) => p.file), ["rss.xml", "rss/1.xml", "rss/2.xml"]);
+    assert.deepEqual(pages.map((p) => p.items.length), [10, 10, 5]);
+    assert.equal(pages[1].links.previous, "/assets/rss.xml");
+    assert.equal(pages[1].links.next, "/assets/rss/2.xml");
+    assert.equal(pages[2].links.next, undefined);
+  });
+
+  it("always yields one page, even when empty", () => {
+    assert.equal(paginate([], 10).length, 1);
+  });
+
+  it("parses --page-size", () => {
+    assert.equal(parsePageSize([]), 10);
+    assert.equal(parsePageSize(["--page-size", "3"]), 3);
+    assert.equal(parsePageSize(["--page-size=4"]), 4);
+    assert.throws(() => parsePageSize(["--page-size", "0"]));
+  });
+
+  it("emits atom paging links", () => {
+    const [, second] = paginate(items, 10);
+    const xml = buildFeed(post({ permalink: "/" }), [], "https://example.com", second.links);
+    assert.match(xml, /<atom:link rel="next" type="application\/rss\+xml" href="https:\/\/example\.com\/assets\/rss\/2\.xml"\/>/);
   });
 });
 
