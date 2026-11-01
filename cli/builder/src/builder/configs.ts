@@ -133,16 +133,11 @@ export function mainConfig(
   buildDirAbs: string,
   libraryName: string
 ): Configuration {
+  // TypeScript 7 has no JS API for ts-loader, so esbuild transpiles instead.
   const tsLoaderOptions = {
-    transpileOnly: true,
-    configFile: ctx.tsConfigFile,
-    onlyCompileBundledFiles: true,
-    compilerOptions: {
-      sourceMap: !args.production,
-      rootDir: args.rootPath,
-      module: 'ESNext',
-      moduleResolution: 'Bundler'
-    }
+    loader: 'tsx',
+    target: 'es2021',
+    tsconfig: ctx.tsConfigFile
   };
   return {
     mode: ctx.nodeEnvStr,
@@ -186,7 +181,7 @@ export function mainConfig(
       rules: [
         {
           test: /\.tsx?$/,
-          loader: 'ts-loader',
+          loader: 'esbuild-loader',
           options: tsLoaderOptions
         },
         {
@@ -236,7 +231,7 @@ export function mainConfig(
           test: /\.mdx$/,
           use: [
             {
-              loader: 'ts-loader',
+              loader: 'esbuild-loader',
               options: tsLoaderOptions
             },
             {
