@@ -1,97 +1,107 @@
-import { statSync } from "node:fs";
-import { extname, join } from "node:path";
-import type { Post } from "./types.js";
-import { absoluteUrl } from "./urls.js";
-import { cdata, element, escapeXml, rfc822 } from "./xml.js";
+import { statSync } from 'node:fs';
+import { extname, join } from 'node:path';
+import { Post } from './types';
+import { absoluteUrl } from './urls';
+import { cdata, element, escapeXml, rfc822 } from './xml';
 
-export interface FeedItem {
+export type FeedItem = {
   post: Post;
   html: string;
-}
+};
+
+export type PageLinks = {
+  self: string;
+  first: string;
+  previous?: string;
+  next?: string;
+};
 
 const MIME: Record<string, string> = {
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".png": "image/png",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp'
 };
 
 function enclosure(post: Post, origin: string): string {
   const cover = post.covers[0];
-  if (!cover) return "";
+  if (!cover) return '';
   const url = absoluteUrl(cover, origin);
-  if (!url) return "";
+  if (!url) return '';
   const relative = cover.startsWith(post.permalink)
-    ? cover.slice(post.permalink.length).replace(/^[/\\]/, "")
-    : cover.replace(/^[/\\]/, "");
+    ? cover.slice(post.permalink.length).replace(/^[/\\]/, '')
+    : cover.replace(/^[/\\]/, '');
   let length = 0;
   try {
     length = statSync(join(post.rootPath, relative)).size;
   } catch {
-    return "";
+    return '';
   }
-  if (length <= 0) return "";
-  const type = MIME[extname(cover).toLowerCase()] || "application/octet-stream";
+  if (length <= 0) return '';
+  const type = MIME[extname(cover).toLowerCase()] || 'application/octet-stream';
   return `<enclosure url="${escapeXml(url)}" length="${length}" type="${type}"/>`;
 }
 
 function author(post: Post): string {
   const person = post.authors[0];
-  if (!person?.email) return "";
-  const name = person.name ? ` (${person.name})` : "";
-  return element("author", person.email + name);
-}
-
-export interface PageLinks {
-  self: string;
-  first: string;
-  previous?: string;
-  next?: string;
+  if (!person?.email) return '';
+  const name = person.name ? ` (${person.name})` : '';
+  return element('author', person.email + name);
 }
 
 function pageLinks(links: PageLinks | undefined, origin: string): string {
-  if (!links) return "";
-  return (["self", "first", "previous", "next"] as const)
+  if (!links) return '';
+  return (['self', 'first', 'previous', 'next'] as const)
     .filter((rel) => links[rel])
-    .map((rel) => `<atom:link rel="${rel}" type="application/rss+xml" href="${escapeXml(absoluteUrl(links[rel]!, origin))}"/>`)
-    .join("\n");
+    .map(
+      (rel) =>
+        `<atom:link rel="${rel}" type="application/rss+xml" href="${escapeXml(absoluteUrl(links[rel]!, origin))}"/>`
+    )
+    .join('\n');
 }
 
-export function buildFeed(root: Post, items: FeedItem[], origin: string, links?: PageLinks): string {
-  const link = absoluteUrl(root.authors[0]?.url || "/", origin) || origin;
-  const categories = root.keywords.map((tag) => element("category", tag)).join("");
+export function buildFeed(
+  root: Post,
+  items: FeedItem[],
+  origin: string,
+  links?: PageLinks
+): string {
+  const link = absoluteUrl(root.authors[0]?.url || '/', origin) || origin;
+  const categories = root.keywords
+    .map((tag) => element('category', tag))
+    .join('');
   const itemXml = items
     .map(({ post, html }) => {
       const itemLink = absoluteUrl(post.permalink, origin);
       const body = html
         ? `<content:encoded>${cdata(html)}</content:encoded>`
-        : "";
+        : '';
       return `<item>
-${element("title", post.title)}
-${element("link", itemLink)}
-${element("description", post.description)}
-${element("guid", itemLink, ' isPermaLink="true"')}
-${element("pubDate", rfc822(post.datePublished))}
+${element('title', post.title)}
+${element('link', itemLink)}
+${element('description', post.description)}
+${element('guid', itemLink, ' isPermaLink="true"')}
+${element('pubDate', rfc822(post.datePublished))}
 ${author(post)}
-${post.keywords.map((tag) => element("category", tag)).join("")}
+${post.keywords.map((tag) => element('category', tag)).join('')}
 ${enclosure(post, origin)}
 ${body}
 </item>`;
     })
-    .join("\n");
+    .join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
-${element("title", root.title)}
+${element('title', root.title)}
 ${pageLinks(links, origin)}
-${element("link", link)}
-${element("description", root.description)}
-${element("language", "en")}
-${element("lastBuildDate", rfc822(new Date()))}
-${element("generator", "foil-rss")}
-${element("docs", "https://www.rssboard.org/rss-specification")}
+${element('link', link)}
+${element('description', root.description)}
+${element('language', 'en')}
+${element('lastBuildDate', rfc822(new Date()))}
+${element('generator', 'foil-rss')}
+${element('docs', 'https://www.rssboard.org/rss-specification')}
 ${categories}
 ${itemXml}
 </channel>

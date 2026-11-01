@@ -1,10 +1,10 @@
-export interface Author {
+export type Author = {
   name: string;
   email: string;
   url: string;
-}
+};
 
-export interface Post {
+export type Post = {
   id: number;
   name: string;
   permalink: string;
@@ -19,4 +19,4 @@ export interface Post {
   outputPath: string;
   publicModules: string[];
   main: string;
-}
+};

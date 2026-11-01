@@ -1,17 +1,19 @@
 #!/usr/bin/env node
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { loadFeedPosts } from "./db.js";
-import { buildFeed } from "./feed.js";
-import { paginate, parsePageSize } from "./pages.js";
-import { renderPost } from "./render.js";
-import { absolutizeHtml, siteOrigin } from "./urls.js";
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { loadFeedPosts } from './db';
+import { buildFeed } from './feed';
+import { paginate, parsePageSize } from './pages';
+import { renderPost } from './render';
+import { absolutizeHtml, siteOrigin } from './urls';
 
 async function generate(pageSize: number): Promise<void> {
   const { root, items } = await loadFeedPosts();
-  const origin = siteOrigin(root.authors[0]?.url || "");
+  const origin = siteOrigin(root.authors[0]?.url || '');
   if (!origin) {
-    console.error("Set FOIL_SITE_URL to an absolute http(s) origin. RSS links cannot be relative.");
+    console.error(
+      'Set FOIL_SITE_URL to an absolute http(s) origin. RSS links cannot be relative.'
+    );
     process.exitCode = 1;
     return;
   }
@@ -26,21 +28,25 @@ async function generate(pageSize: number): Promise<void> {
     }
     rendered.push({
       post: item,
-      html: absolutizeHtml(result.html, origin),
+      html: absolutizeHtml(result.html, origin)
     });
   }
 
   const pages = paginate(rendered, pageSize);
 
   // Page numbers shift as posts are published, so drop old pages first.
-  const rssDir = join(root.outputPath, "rss");
+  const rssDir = join(root.outputPath, 'rss');
   await mkdir(root.outputPath, { recursive: true });
   await rm(rssDir, { recursive: true, force: true });
   await mkdir(rssDir, { recursive: true });
 
   for (const page of pages) {
     const output = join(root.outputPath, page.file);
-    await writeFile(output, buildFeed(root, page.items, origin, page.links), "utf8");
+    await writeFile(
+      output,
+      buildFeed(root, page.items, origin, page.links),
+      'utf8'
+    );
     console.log(`Wrote ${output}`);
   }
 }
