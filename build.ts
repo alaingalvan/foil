@@ -54,11 +54,12 @@ async function run(cmd: string, opts: { cwd?: string } = {}): Promise<string> {
 
 await Promise.all([
   run('cargo build --release', { cwd: 'backend' }),
-  run('cargo build --release', { cwd: 'cli' }),
-  run('npm install', { cwd: join(__dirname, 'cli/builder') }),
-  run('npm start', { cwd: join(__dirname, 'cli/builder') }),
-  run('npm install', { cwd: join(__dirname, 'rss') }),
-  run('npm start', { cwd: join(__dirname, 'rss') })
+  run('cargo build --release', { cwd: 'cli' })
+]);
+
+await Promise.all([
+  run('npm ci && npm start', { cwd: join(__dirname, 'cli/builder') }),
+  run('npm ci && npm start', { cwd: join(__dirname, 'rss') })
 ]);
 
 await mkdir(buildDir, { recursive: true });
