@@ -1,7 +1,7 @@
 use crate::clean_path_string;
 use async_graphql::dataloader::Loader;
 use async_graphql::futures_util::TryStreamExt;
-use async_graphql::{Context, FieldError, Object, Result, SimpleObject};
+use async_graphql::{Context, Enum, FieldError, Object, Result, SimpleObject};
 use chrono::{DateTime, Utc};
 use log::error;
 use serde::Serialize;
@@ -11,6 +11,16 @@ use std::path::PathBuf;
 
 pub fn err<'a, T>(msg: &'a str) -> Result<T, async_graphql::Error> {
     Err(async_graphql::Error::new(msg))
+}
+
+/// 📅 The date field used to sort posts returned from a glob query.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Enum)]
+pub enum PostOrderBy {
+    /// Newest published first.
+    #[default]
+    PublishedDate,
+    /// Most recently updated first.
+    ModifiedDate,
 }
 
 /// 🎇 An author of a Foil post.
@@ -198,6 +208,7 @@ impl QueryPosts {
         permalink: String,
         offset: Option<i32>,
         limit: Option<i32>,
+        order_by: Option<PostOrderBy>,
     ) -> Result<Vec<Post>> {
         if permalink.len() > 254 {
             let err_str = format!(
@@ -230,11 +241,13 @@ impl QueryPosts {
 
         let offset = offset.unwrap_or(0).min(10000);
         let limit = limit.unwrap_or(10).min(100);
+        let order_by_modified = order_by.unwrap_or_default() == PostOrderBy::ModifiedDate;
 
         let sql_result: Vec<Post> = sqlx::query_as(cur_query)
             .bind(&permalink_regex)
             .bind(&limit)
             .bind(&offset)
+            .bind(order_by_modified)
             .fetch(postgres_pool)
             .map_err(|x| {
                 error!("Query failed: {}", x.to_string());
