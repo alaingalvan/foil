@@ -139,6 +139,7 @@ export function mainConfig(
     target: 'es2021',
     tsconfig: ctx.tsConfigFile
   };
+
   return {
     mode: ctx.nodeEnvStr,
     context: args.rootPath,
